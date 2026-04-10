@@ -11,8 +11,8 @@
   // El depósito activo — solo muestra productos asignados a este depósito
   // undefined = mostrar todos (útil para otros contextos)
   export let depotId: number | undefined = 1;
+  export let query = '';
 
-  let query        = '';
   let categories: string[] = [];
   let activeCategory = 'Todos';
   let debounceTimer: ReturnType<typeof setTimeout>;

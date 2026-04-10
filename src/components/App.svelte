@@ -4,6 +4,7 @@
   import ResultsList     from './ResultsList.svelte';
   import StockModal      from './StockModal.svelte';
   import SyncStatus      from './SyncStatus.svelte';
+  import ExportCSV       from './ExportCSV.svelte';
   import DepotSelector   from './DepotSelector.svelte';
   import BottomNav       from './BottomNav.svelte';
   import SettingsSheet   from './SettingsSheet.svelte';
@@ -18,6 +19,7 @@
   let products:        Product[] = [];
   let isLoading        = false;
   let selectedProduct: Product | null = null;
+  let searchQuery      = '';
   let modalOpen        = false;
   let activeCategory   = 'Todos';
   let appReady         = false;
@@ -97,7 +99,10 @@
         <span class="brand-depot">{depot.name}</span>
       </div>
     </div>
-    <SyncStatus />
+    <div class="header-actions" style="display: flex; gap: 8px; align-items: center;">
+      <ExportCSV {products} {depotId} categoryLabel={activeCategory} />
+      <SyncStatus />
+    </div>
   </header>
 
   <!-- Contenido principal (con padding para el bottom nav) -->
@@ -106,6 +111,7 @@
       onResults={handleResults}
       onCategoryChange={handleCategoryChange}
       bind:isLoading
+      bind:query={searchQuery}
     />
 
     {#key stockVersion + '-' + depotId}
@@ -113,6 +119,7 @@
         {products}
         {isLoading}
         {depotId}
+        query={searchQuery}
         on:addStock={openModal}
       />
     {/key}
