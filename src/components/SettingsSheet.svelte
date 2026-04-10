@@ -81,9 +81,20 @@
 
       <div class="divider"></div>
 
-      <!-- Sección: Exportar -->
+      <!-- Sección: Herramientas -->
       <section class="section">
-        <p class="section-label">Exportar</p>
+        <p class="section-label">Herramientas</p>
+        
+        <a href="/clasificar" class="action-row" style="margin-bottom: 8px; text-decoration: none; color: inherit;">
+          <span class="action-icon">⬡</span>
+          <span class="action-label">Clasificar productos</span>
+        </a>
+
+        <a href="/settings" class="action-row" style="margin-bottom: 12px; text-decoration: none; color: inherit;">
+          <span class="action-icon">⚙</span>
+          <span class="action-label">Umbrales de stock</span>
+        </a>
+
         <div class="export-wrap">
           <ExportCSV {products} {depotId} {categoryLabel} />
           <span class="export-hint">

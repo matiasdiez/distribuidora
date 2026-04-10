@@ -1,4 +1,7 @@
 ---
+import Settings from '../components/Settings.svelte';
+import '../styles/global.css';
+
 export const prerender = true;
 ---
 <!doctype html>
@@ -16,10 +19,6 @@ export const prerender = true;
   <link rel="stylesheet" href="/styles/global.css" />
 </head>
 <body>
-  <div id="settings-app"></div>
-  <script>
-    import Settings from '../components/Settings.svelte';
-    new Settings({ target: document.getElementById('settings-app') });
-  </script>
+  <Settings client:only="svelte" />
 </body>
 </html>

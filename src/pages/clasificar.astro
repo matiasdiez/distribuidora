@@ -1,5 +1,8 @@
 ---
 // /clasificar — Asignación masiva de productos a depósitos
+import Clasificar from '../components/Clasificar.svelte';
+import '../styles/global.css';
+
 export const prerender = true;
 ---
 
@@ -21,11 +24,6 @@ export const prerender = true;
   <link rel="stylesheet" href="/styles/global.css" />
 </head>
 <body>
-  <div id="clas-app"></div>
-
-  <script>
-    import Clasificar from '../components/Clasificar.svelte';
-    new Clasificar({ target: document.getElementById('clas-app') });
-  </script>
+  <Clasificar client:only="svelte" />
 </body>
 </html>

@@ -1,11 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { searchProducts, getDepots } from '../lib/idb';
+  import { searchProducts, getDepots, getStockByProduct } from '../lib/idb';
   import { initConnectivityListeners, initialSync } from '../lib/sync';
+  import {
+    loadThresholds, calcFreshness, worstStatus,
+    type FreshnessThresholds, type FreshnessStatus
+  } from '../lib/freshness';
   import { loadSavedDepot } from '../lib/depotStore';
   import { initTheme } from '../lib/themeStore';
   import SwipeCard     from './SwipeCard.svelte';
   import SyncStatus    from './SyncStatus.svelte';
+  import FreshnessDot  from './FreshnessDot.svelte';
   import BottomNav     from './BottomNav.svelte';
   import SettingsSheet from './SettingsSheet.svelte';
   import type { Product, Depot } from '../lib/supabase';
@@ -25,6 +30,8 @@
   let products: Product[]     = [];   // productos del brand/filtro activo
   let appReady                = false;
   let stockVersion            = 0;
+  let thresholds: FreshnessThresholds | null = null;
+  let brandFreshness: Record<string, FreshnessStatus> = {};
 
   // ── Swipe ─────────────────────────────────────────────────────────────────
   let currentIndex    = 0;
@@ -52,16 +59,42 @@
     (async () => {
       depots      = await getDepots();
       await initialSync();
+      thresholds = await loadThresholds();
       allProducts = await searchProducts('');
       buildBrandsAndCategories();
+      await computeBrandFreshness();
       appReady = true;
     })();
     return cleanup;
   });
 
+  async function computeBrandFreshness() {
+    if (!thresholds) return;
+    const t   = thresholds;
+    const map: Record<string, FreshnessStatus> = {};
 
+    // Agrupar productos por marca
+    const byBrand: Record<string, Product[]> = {};
+    for (const p of allProducts) {
+      if (!byBrand[p.brand]) byBrand[p.brand] = [];
+      byBrand[p.brand].push(p);
+    }
 
-  function buildBrandsAndCategories() {
+    for (const [brand, prods] of Object.entries(byBrand)) {
+      const statuses: FreshnessStatus[] = await Promise.all(
+        prods.map(async p => {
+          const lots   = await getStockByProduct(p.id);
+          const depot  = lots.filter(l => l.depot_id === depotId);
+          const latest = depot.length > 0
+            ? depot.map(l => new Date(l.created_at)).sort((a, b) => b.getTime() - a.getTime())[0]
+            : null;
+          return calcFreshness(latest, t).status as FreshnessStatus;
+        })
+      );
+      map[brand] = worstStatus(statuses);
+    }
+    brandFreshness = map;
+  }  function buildBrandsAndCategories() {
     // Categorías únicas
     categories = ['Todos', ...new Set(allProducts.map(p => p.category))].sort();
     // Marcas únicas (filtradas por categoría activa)
@@ -258,7 +291,12 @@
             on:click={() => selectBrand(brand)}
           >
             <span class="brand-name">{brand}</span>
-            <span class="brand-count">{count}</span>
+            <div class="brand-right">
+              {#if brandFreshness[brand]}
+                <FreshnessDot status={brandFreshness[brand]} size="sm" />
+              {/if}
+              <span class="brand-count">{count}</span>
+            </div>
           </button>
         {/each}
       </div>
@@ -542,6 +580,13 @@
     color: var(--text-hi, #f0f0f0);
     letter-spacing: 0.03em;
     text-transform: uppercase;
+  }
+
+  .brand-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .brand-count {
