@@ -9,6 +9,7 @@ export interface Product {
   weight_qty: string | null;
   price: number | null;
   category: string;
+  depot_id: number | null;   // ← depósito asignado (null = sin asignar)
   created_at: string;
 }
 
@@ -33,6 +34,7 @@ export interface StockSummary {
   brand: string;
   description: string;
   weight_qty: string | null;
+  price: number | null;
   category: string;
   depot_name: string;
   total_stock: number;
@@ -59,34 +61,15 @@ export const supabase = createClient<{
 
 // ── Helpers de lectura ────────────────────────────────────────
 
-/** Trae todos los productos para sync inicial.
- *  Supabase/PostgREST limita a 1000 filas por request: necesitamos paginar
- *  hasta obtener todos los registros.
- */
+/** Trae todos los productos para sync inicial */
 export async function fetchAllProducts(): Promise<Product[]> {
-  const PAGE_SIZE = 1000;
-  const all: Product[] = [];
-  let from = 0;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('brand', { ascending: true });
 
-  while (true) {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('brand', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) throw error;
-
-    const page = data ?? [];
-    all.push(...page);
-
-    // Si devolvió menos filas que el tamaño de página, llegamos al final
-    if (page.length < PAGE_SIZE) break;
-
-    from += PAGE_SIZE;
-  }
-
-  return all;
+  if (error) throw error;
+  return data ?? [];
 }
 
 /** Trae todo el stock de un depósito */
@@ -95,16 +78,6 @@ export async function fetchStockByDepot(depotId: number): Promise<StockEntry[]> 
     .from('stock_entries')
     .select('*')
     .eq('depot_id', depotId);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-/** Trae TODO el stock de todos los depósitos (para sync offline-first) */
-export async function fetchAllStock(): Promise<StockEntry[]> {
-  const { data, error } = await supabase
-    .from('stock_entries')
-    .select('*');
 
   if (error) throw error;
   return data ?? [];
@@ -134,6 +107,19 @@ export async function insertProducts(products: Omit<Product, 'id' | 'created_at'
   const { error } = await supabase
     .from('products')
     .upsert(products, { onConflict: 'code' });
+
+  if (error) throw error;
+}
+
+/** Asigna un depósito a una lista de productos (bulk) */
+export async function assignProductsToDepot(
+  productIds: number[],
+  depotId: number | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('products')
+    .update({ depot_id: depotId })
+    .in('id', productIds);
 
   if (error) throw error;
 }

@@ -8,6 +8,10 @@
   export let onCategoryChange: (cat: string) => void        = () => {};
   export let isLoading: boolean = false;
 
+  // El depósito activo — solo muestra productos asignados a este depósito
+  // undefined = mostrar todos (útil para otros contextos)
+  export let depotId: number | undefined = 1;
+
   let query        = '';
   let categories: string[] = [];
   let activeCategory = 'Todos';
@@ -23,7 +27,7 @@
     debounceTimer = setTimeout(async () => {
       isLoading = true;
       const cat = activeCategory === 'Todos' ? undefined : activeCategory;
-      const results = await searchProducts(query, cat);
+      const results = await searchProducts(query, cat, depotId);
       onResults(results);
       isLoading = false;
     }, 150);

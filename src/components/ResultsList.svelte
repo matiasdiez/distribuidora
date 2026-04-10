@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { getTotalStock, getStockByProduct } from '../lib/idb';
+  import { loadThresholds, calcFreshness, type FreshnessThresholds } from '../lib/freshness';
+  import FreshnessDot from './FreshnessDot.svelte';
   import type { Product } from '../lib/supabase';
 
   export let products: Product[] = [];
@@ -12,23 +14,48 @@
     addStock: { product: Product };
   }>();
 
-  // Cache de stock por product_id para no releer IndexedDB en cada render
-  let stockCache: Record<number, number> = {};
+  let stockCache:     Record<number, number>    = {};
+  let freshnessCache: Record<number, { status: string; label: string }> = {};
+  let thresholds: FreshnessThresholds | null = null;
 
-  $: if (products.length > 0) loadStockCache(products);
+  onMount(async () => {
+    thresholds = await loadThresholds();
+  });
 
-  async function loadStockCache(list: Product[]) {
+  $: if (products.length > 0 && thresholds) loadCaches(products);
+
+  async function loadCaches(list: Product[]) {
+    const t = thresholds!;
     const entries = await Promise.all(
-      list.map(async p => [p.id, await getTotalStock(p.id, depotId)] as [number, number])
+      list.map(async p => {
+        const lots  = await getStockByProduct(p.id);
+        const depot = lots.filter(l => l.depot_id === depotId);
+        const total = depot.reduce((s, l) => s + l.quantity, 0);
+
+        // Fecha más reciente entre todos los lotes del depósito
+        const latest = depot.length > 0
+          ? depot.map(l => new Date(l.created_at)).sort((a, b) => b.getTime() - a.getTime())[0]
+          : null;
+        const fresh = calcFreshness(latest, t);
+
+        return [p.id, { total, fresh }] as const;
+      })
     );
-    stockCache = Object.fromEntries(entries);
+
+    const sc: Record<number, number> = {};
+    const fc: Record<number, { status: string; label: string }> = {};
+    for (const [id, { total, fresh }] of entries) {
+      sc[id] = total;
+      fc[id] = { status: fresh.status, label: fresh.label };
+    }
+    stockCache     = sc;
+    freshnessCache = fc;
   }
 
   function openModal(product: Product) {
     dispatch('addStock', { product });
   }
 
-  // Resaltar coincidencias en el texto
   function highlight(text: string, q: string): string {
     if (!q || q.length < 2) return text;
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,6 +91,7 @@
       {#each products as product (product.id)}
         {@const stock = stockCache[product.id] ?? 0}
         {@const hasStock = stock > 0}
+        {@const fresh = freshnessCache[product.id]}
 
         <div class="product-card" class:has-stock={hasStock}>
 
@@ -81,12 +109,19 @@
                 <span class="product-code">{product.code}</span>
               </div>
 
-              <!-- Indicador de stock -->
+              <!-- Indicador de stock + frescura -->
               <div class="stock-indicator">
                 {#if hasStock}
                   <span class="badge badge-green">{stock} u.</span>
                 {:else}
                   <span class="badge badge-red">Sin stock</span>
+                {/if}
+                {#if fresh}
+                  <FreshnessDot
+                    status={fresh.status}
+                    label={fresh.label}
+                    size="sm"
+                  />
                 {/if}
               </div>
             </div>
@@ -275,5 +310,8 @@
   /* Indicador de stock */
   .stock-indicator {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 </style>

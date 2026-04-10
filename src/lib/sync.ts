@@ -20,18 +20,10 @@ import {
 
 import {
   fetchAllProducts,
-  fetchAllStock,
+  fetchStockByDepot,
   fetchDepots,
   upsertStockEntry,
 } from './supabase';
-
-/**
- * Versión de los datos locales.
- * Incrementar este número fuerza un re-sync completo en todos los dispositivos,
- * incluso si los datos en IndexedDB parecen frescos (< 24h).
- * Usar cuando cambie la lógica de fetching o el schema de datos.
- */
-const DATA_VERSION = '2';  // ← incrementar si cambia fetch/schema
 
 // Evento custom que los componentes Svelte pueden escuchar
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';
@@ -61,23 +53,16 @@ export async function initialSync(depotId: number = 1): Promise<void> {
     return;
   }
 
-  // Verificar si ya está inicializado, los datos son recientes Y la versión coincide
+  // Verificar si ya está inicializado y si los datos son recientes
   if (await isInitialized()) {
-    const lastSync    = await getMeta('last_sync');
-    const dataVersion = await getMeta('data_version');
-    const versionOk   = dataVersion === DATA_VERSION;
-
-    if (lastSync && versionOk) {
+    const lastSync = await getMeta('last_sync');
+    if (lastSync) {
       const hoursSince = (Date.now() - new Date(lastSync).getTime()) / 36e5;
       if (hoursSince < 24) {
-        // Datos frescos y versión correcta, no es necesario re-sync
+        // Datos frescos, no es necesario re-sync
         emit('idle');
         return;
       }
-    }
-    // Si la versión no coincide, forzamos re-sync aunque los datos sean frescos
-    if (!versionOk) {
-      console.log(`[sync] versión de datos cambió (${dataVersion} → ${DATA_VERSION}), forzando re-sync`);
     }
   }
 
@@ -94,14 +79,11 @@ export async function initialSync(depotId: number = 1): Promise<void> {
 
     emit('syncing', 'Descargando stock...');
 
-    // Descarga TODO el stock de todos los depósitos de una sola vez.
-    // Así al cambiar de depósito no hace falta un nuevo request de red.
-    const stock = await fetchAllStock();
+    const stock = await fetchStockByDepot(depotId);
     await saveStockEntries(stock);
 
-    await setMeta('initialized',  'true');
-    await setMeta('last_sync',     new Date().toISOString());
-    await setMeta('data_version',  DATA_VERSION);
+    await setMeta('initialized', 'true');
+    await setMeta('last_sync', new Date().toISOString());
 
     emit('success', `${products.length} productos sincronizados`);
   } catch (err) {
@@ -132,10 +114,13 @@ export async function syncPending(): Promise<void> {
       if (item.type === 'stock_upsert') {
         await upsertStockEntry(item.payload);
         if (item.id) synced.push(item.id);
+      } else if (item.type === 'depot_assignment') {
+        const { assignProductsToDepot } = await import('./supabase');
+        await assignProductsToDepot(item.payload.product_ids, item.payload.depot_id);
+        if (item.id) synced.push(item.id);
       }
     } catch (err) {
       console.error('[sync] failed to sync item:', item, err);
-      // No cortamos el loop — intentamos los demás
     }
   }
 
