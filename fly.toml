@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for deposito-app on 2026-04-07T00:40:53-03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'deposito-app'
+primary_region = 'gru'
+
+[build]
+
+[env]
+  HOST = '0.0.0.0'
+  PORT = '4321'
+
+[http_service]
+  internal_port = 4321
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256

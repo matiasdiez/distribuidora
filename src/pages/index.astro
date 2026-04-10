@@ -1,0 +1,33 @@
+---
+// index.astro — página principal de la app
+import App from '../components/App.svelte';
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Depósito" />
+  <meta name="description" content="Consulta y control de stock del depósito" />
+
+  <title>Depósito</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Íconos -->
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+</head>
+
+<body>
+  <!-- App Svelte montada solo en el cliente (PWA offline-first, no necesita SSR) -->
+  <App client:only="svelte" />
+</body>
+</html>

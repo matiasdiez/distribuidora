@@ -1,0 +1,139 @@
+import { createClient } from '@supabase/supabase-js';
+
+// Tipos que reflejan el schema de Supabase
+export interface Product {
+  id: number;
+  code: string;
+  brand: string;
+  description: string;
+  weight_qty: string | null;
+  price: number | null;
+  category: string;
+  created_at: string;
+}
+
+export interface StockEntry {
+  id: number;
+  product_id: number;
+  depot_id: number;
+  lot_number: string;
+  quantity: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface Depot {
+  id: number;
+  name: string;
+}
+
+export interface StockSummary {
+  product_id: number;
+  code: string;
+  brand: string;
+  description: string;
+  weight_qty: string | null;
+  category: string;
+  depot_name: string;
+  total_stock: number;
+  lot_count: number;
+}
+
+// Cliente singleton — se puede usar en Svelte y en API routes
+const supabaseUrl  = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseKey  = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+export const supabase = createClient<{
+  public: {
+    Tables: {
+      products:      { Row: Product };
+      stock_entries: { Row: StockEntry };
+      depots:        { Row: Depot };
+    };
+    Views: {
+      stock_summary: { Row: StockSummary };
+    };
+  };
+}>(supabaseUrl, supabaseKey);
+
+
+// ── Helpers de lectura ────────────────────────────────────────
+
+/** Trae todos los productos para sync inicial.
+ *  Supabase/PostgREST limita a 1000 filas por request: necesitamos paginar
+ *  hasta obtener todos los registros.
+ */
+export async function fetchAllProducts(): Promise<Product[]> {
+  const PAGE_SIZE = 1000;
+  const all: Product[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('brand', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = data ?? [];
+    all.push(...page);
+
+    // Si devolvió menos filas que el tamaño de página, llegamos al final
+    if (page.length < PAGE_SIZE) break;
+
+    from += PAGE_SIZE;
+  }
+
+  return all;
+}
+
+/** Trae todo el stock de un depósito */
+export async function fetchStockByDepot(depotId: number): Promise<StockEntry[]> {
+  const { data, error } = await supabase
+    .from('stock_entries')
+    .select('*')
+    .eq('depot_id', depotId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Trae TODO el stock de todos los depósitos (para sync offline-first) */
+export async function fetchAllStock(): Promise<StockEntry[]> {
+  const { data, error } = await supabase
+    .from('stock_entries')
+    .select('*');
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Trae todos los depósitos */
+export async function fetchDepots(): Promise<Depot[]> {
+  const { data, error } = await supabase.from('depots').select('*');
+  if (error) throw error;
+  return data ?? [];
+}
+
+
+// ── Helpers de escritura ──────────────────────────────────────
+
+/** Agrega o actualiza un lote (upsert por product_id + depot_id + lot_number) */
+export async function upsertStockEntry(entry: Omit<StockEntry, 'id' | 'created_at'>): Promise<void> {
+  const { error } = await supabase
+    .from('stock_entries')
+    .upsert(entry, { onConflict: 'product_id,depot_id,lot_number' });
+
+  if (error) throw error;
+}
+
+/** Inserta productos nuevos en batch */
+export async function insertProducts(products: Omit<Product, 'id' | 'created_at'>[]): Promise<void> {
+  const { error } = await supabase
+    .from('products')
+    .upsert(products, { onConflict: 'code' });
+
+  if (error) throw error;
+}

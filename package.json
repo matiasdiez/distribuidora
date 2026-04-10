@@ -1,0 +1,23 @@
+{
+  "name": "deposito-app",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.5.5",
+    "@astrojs/svelte": "^8.0.4",
+    "@supabase/supabase-js": "^2.47.0",
+    "astro": "^5.1.0",
+    "idb": "^8.0.0",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
