@@ -1,4 +1,4 @@
-import { a3 as NOOP_MIDDLEWARE_HEADER, a4 as REDIRECT_STATUS_CODES, A as AstroError, a5 as ActionsReturnedInvalidDataError, a6 as escape, D as DEFAULT_404_COMPONENT } from './astro/server_B_mT1j0F.mjs';
+import { a3 as NOOP_MIDDLEWARE_HEADER, a4 as REDIRECT_STATUS_CODES, A as AstroError, a5 as ActionsReturnedInvalidDataError, a6 as escape, D as DEFAULT_404_COMPONENT } from './astro/server_Duwb4HEG.mjs';
 import { D as DevalueError, i as is_primitive, g as get_type, a as is_plain_object, e as enumerable_symbols, b as stringify_key, s as stringify_string, v as valid_array_indices } from './utils_BzE4-Fnd.mjs';
 
 /* Baseline 2025 runtimes */

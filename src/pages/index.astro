@@ -1,6 +1,5 @@
 ---
 // index.astro — página principal de la app
-import App from '../components/App.svelte';
 import '../styles/global.css';
 ---
 
@@ -28,6 +27,11 @@ import '../styles/global.css';
 
 <body>
   <!-- App Svelte montada solo en el cliente (PWA offline-first, no necesita SSR) -->
-  <App client:only="svelte" />
+  <div id="index-app"></div>
+  <script>
+    import { mount } from 'svelte';
+    import App from '../components/App.svelte';
+    mount(App, { target: document.getElementById('index-app') });
+  </script>
 </body>
 </html>

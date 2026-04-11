@@ -1,7 +1,5 @@
 ---
-import Settings from '../components/Settings.svelte';
 import '../styles/global.css';
-
 export const prerender = true;
 ---
 <!doctype html>
@@ -16,9 +14,13 @@ export const prerender = true;
   <title>Ajustes — Depósito</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="manifest" href="/manifest.json" />
-  <link rel="stylesheet" href="/styles/global.css" />
 </head>
 <body>
-  <Settings client:only="svelte" />
+  <div id="settings-app"></div>
+  <script>
+    import { mount } from 'svelte';
+    import Settings from '../components/Settings.svelte';
+    mount(Settings, { target: document.getElementById('settings-app') });
+  </script>
 </body>
 </html>

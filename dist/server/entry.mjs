@@ -1,16 +1,20 @@
 import { renderers } from './renderers.mjs';
-import { c as createExports, s as serverEntrypointModule } from './chunks/_@astrojs-ssr-adapter_C--1PE58.mjs';
-import { manifest } from './manifest_DHoYsg2c.mjs';
+import { c as createExports, s as serverEntrypointModule } from './chunks/_@astrojs-ssr-adapter_7IzS5Lfv.mjs';
+import { manifest } from './manifest_mFaROxZu.mjs';
 
 const serverIslandMap = new Map();;
 
-const _page0 = () => import('./pages/stock.astro.mjs');
-const _page1 = () => import('./pages/swipe.astro.mjs');
-const _page2 = () => import('./pages/index.astro.mjs');
+const _page0 = () => import('./pages/clasificar.astro.mjs');
+const _page1 = () => import('./pages/settings.astro.mjs');
+const _page2 = () => import('./pages/stock.astro.mjs');
+const _page3 = () => import('./pages/swipe.astro.mjs');
+const _page4 = () => import('./pages/index.astro.mjs');
 const pageMap = new Map([
-    ["src/pages/stock.astro", _page0],
-    ["src/pages/swipe.astro", _page1],
-    ["src/pages/index.astro", _page2]
+    ["src/pages/clasificar.astro", _page0],
+    ["src/pages/settings.astro", _page1],
+    ["src/pages/stock.astro", _page2],
+    ["src/pages/swipe.astro", _page3],
+    ["src/pages/index.astro", _page4]
 ]);
 
 const _manifest = Object.assign(manifest, {

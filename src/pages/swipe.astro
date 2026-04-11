@@ -1,6 +1,5 @@
 ---
 // /swipe — Interfaz de swipe entre productos por marca
-import SwipeProductos from '../components/SwipeProductos.svelte';
 import '../styles/global.css';
 ---
 
@@ -21,6 +20,11 @@ import '../styles/global.css';
   <link rel="manifest" href="/manifest.json" />
 </head>
 <body>
-  <SwipeProductos client:only="svelte" />
+  <div id="swipe-app"></div>
+  <script>
+    import { mount } from 'svelte';
+    import SwipeProductos from '../components/SwipeProductos.svelte';
+    mount(SwipeProductos, { target: document.getElementById('swipe-app') });
+  </script>
 </body>
 </html>

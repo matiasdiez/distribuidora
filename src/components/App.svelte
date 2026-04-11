@@ -1,74 +1,89 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import Buscador        from './Buscador.svelte';
-  import ResultsList     from './ResultsList.svelte';
-  import StockModal      from './StockModal.svelte';
-  import SyncStatus      from './SyncStatus.svelte';
-  import ExportCSV       from './ExportCSV.svelte';
-  import DepotSelector   from './DepotSelector.svelte';
-  import BottomNav       from './BottomNav.svelte';
-  import SettingsSheet   from './SettingsSheet.svelte';
+  import { onMount, onDestroy } from "svelte";
+  import Buscador from "./Buscador.svelte";
+  import ResultsList from "./ResultsList.svelte";
+  import StockModal from "./StockModal.svelte";
+  import SyncStatus from "./SyncStatus.svelte";
+  import ExportCSV from "./ExportCSV.svelte";
+  import DepotSelector from "./DepotSelector.svelte";
+  import BottomNav from "./BottomNav.svelte";
+  import SettingsSheet from "./SettingsSheet.svelte";
 
-  import { isInitialized, countProducts, getDepots } from '../lib/idb';
-  import { initialSync, initConnectivityListeners } from '../lib/sync';
-  import { loadSavedDepot, setActiveDepot } from '../lib/depotStore';
-  import { initTheme } from '../lib/themeStore';
-  import type { Product, Depot } from '../lib/supabase';
+  import { isInitialized, countProducts, getDepots } from "../lib/idb";
+  import { initialSync, initConnectivityListeners } from "../lib/sync";
+  import { loadSavedDepot, setActiveDepot } from "../lib/depotStore";
+  import { initTheme } from "../lib/themeStore";
+  import type { Product, Depot } from "../lib/supabase";
 
   // ── Estado ─────────────────────────────────────────────────────
-  let products:        Product[] = [];
-  let isLoading        = false;
+  let products: Product[] = [];
+  let isLoading = false;
   let selectedProduct: Product | null = null;
-  let searchQuery      = '';
-  let modalOpen        = false;
-  let activeCategory   = 'Todos';
-  let appReady         = false;
-  let initMessage      = '';
-  let stockVersion     = 0;
-  let depots: Depot[]  = [];
+  let searchQuery = "";
+  let modalOpen = false;
+  let activeCategory = "Todos";
+  let appReady = false;
+  let initMessage = "";
+  let stockVersion = 0;
+  let depots: Depot[] = [];
   let depot: Depot | null = null;
-  let showSettings     = false;
+  let showSettings = false;
   let cleanupListeners: () => void;
 
   $: depotId = depot?.id ?? 1;
 
   onMount(async () => {
-    initTheme();
-    cleanupListeners = initConnectivityListeners();
+    try {
+      initTheme();
+      cleanupListeners = initConnectivityListeners();
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
-    }
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(console.error);
+      }
 
-    depot  = loadSavedDepot();
-    depots = await getDepots();
+      depot = loadSavedDepot();
+      depots = await getDepots();
 
-    const initialized = await isInitialized();
-    const count       = await countProducts();
+      const initialized = await isInitialized();
+      const count = await countProducts();
 
-    if (initialized && count > 0) {
-      appReady = true;
-      initialSync();
-    } else {
-      initMessage = 'Descargando productos...';
-      await initialSync();
-      depots   = await getDepots();
-      appReady    = true;
-      initMessage = '';
+      if (initialized && count > 0) {
+        appReady = true;
+        initialSync();
+      } else {
+        initMessage = "Descargando productos...";
+        await initialSync();
+        depots = await getDepots();
+        appReady = true;
+        initMessage = "";
+      }
+    } catch (err) {
+      console.error("[App] Error al inicializar la aplicación:", err);
+      initMessage = "Error al iniciar la app. Recargá la página";
     }
   });
 
   onDestroy(() => cleanupListeners?.());
 
-  function handleResults(prods: Product[]) { products = prods; }
-  function handleCategoryChange(cat: string) { activeCategory = cat; }
+  function handleResults(prods: Product[]) {
+    products = prods;
+  }
+  function handleCategoryChange(cat: string) {
+    activeCategory = cat;
+  }
 
   function openModal(e: CustomEvent<{ product: Product }>) {
     selectedProduct = e.detail.product;
     modalOpen = true;
   }
-  function closeModal() { modalOpen = false; selectedProduct = null; }
-  function handleStockSaved() { stockVersion++; closeModal(); }
+  function closeModal() {
+    modalOpen = false;
+    selectedProduct = null;
+  }
+  function handleStockSaved() {
+    stockVersion++;
+    closeModal();
+  }
 
   function handleDepotSelected(d: Depot) {
     depot = d;
@@ -83,12 +98,10 @@
     <div class="splash-logo">⬡</div>
     <div class="splash-name">DEPÓSITO</div>
     <div class="splash-spinner">⟳</div>
-    <p class="splash-msg">{initMessage || 'Iniciando...'}</p>
+    <p class="splash-msg">{initMessage || "Iniciando..."}</p>
   </div>
-
 {:else if !depot}
   <DepotSelector {depots} on:selected={(e) => handleDepotSelected(e.detail)} />
-
 {:else}
   <!-- Header compacto: solo marca + contexto -->
   <header class="app-header">
@@ -99,7 +112,10 @@
         <span class="brand-depot">{depot.name}</span>
       </div>
     </div>
-    <div class="header-actions" style="display: flex; gap: 8px; align-items: center;">
+    <div
+      class="header-actions"
+      style="display: flex; gap: 8px; align-items: center;"
+    >
       <ExportCSV {products} {depotId} categoryLabel={activeCategory} />
       <SyncStatus />
     </div>
@@ -114,7 +130,7 @@
       bind:query={searchQuery}
     />
 
-    {#key stockVersion + '-' + depotId}
+    {#key stockVersion + "-" + depotId}
       <ResultsList
         {products}
         {isLoading}
@@ -126,7 +142,7 @@
   </main>
 
   <!-- Navegación inferior -->
-  <BottomNav activePage="search" on:settings={() => showSettings = true} />
+  <BottomNav activePage="search" on:settings={() => (showSettings = true)} />
 
   <!-- Modal de stock -->
   <StockModal
@@ -145,7 +161,7 @@
     categoryLabel={activeCategory}
     {depots}
     activeDepot={depot}
-    on:close={() => showSettings = false}
+    on:close={() => (showSettings = false)}
     on:depotSelected={(e) => handleDepotSelected(e.detail)}
   />
 {/if}
@@ -234,7 +250,11 @@
   }
 
   @keyframes spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

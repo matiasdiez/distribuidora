@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#0d0d0d"/>
+  <!-- Hexágono estilizado -->
+  <polygon
+    points="96,20 158,56 158,128 96,164 34,128 34,56"
+    fill="none"
+    stroke="#f5a623"
+    stroke-width="8"
+  />
+  <!-- Letra D central -->
+  <text
+    x="96" y="118"
+    font-family="monospace"
+    font-size="72"
+    font-weight="700"
+    fill="#f5a623"
+    text-anchor="middle"
+  >D</text>
+</svg>
