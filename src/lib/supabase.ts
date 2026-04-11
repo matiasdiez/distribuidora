@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 // Tipos que reflejan el schema de Supabase
 export interface Product {
@@ -9,7 +9,7 @@ export interface Product {
   weight_qty: string | null;
   price: number | null;
   category: string;
-  depot_id: number | null;   // ← depósito asignado (null = sin asignar)
+  depot_id: number | null; // ← depósito asignado (null = sin asignar)
   created_at: string;
 }
 
@@ -18,7 +18,9 @@ export interface StockEntry {
   product_id: number;
   depot_id: number;
   lot_number: string;
-  quantity: number;
+  quantity: number; // unidades sueltas
+  boxes: number; // cajas completas (0 si no aplica)
+  expiry_date: string | null; // ISO date "YYYY-MM-DD", null si no aplica
   notes: string | null;
   created_at: string;
 }
@@ -42,15 +44,15 @@ export interface StockSummary {
 }
 
 // Cliente singleton — se puede usar en Svelte y en API routes
-const supabaseUrl  = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseKey  = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 export const supabase = createClient<{
   public: {
     Tables: {
-      products:      { Row: Product };
+      products: { Row: Product };
       stock_entries: { Row: StockEntry };
-      depots:        { Row: Depot };
+      depots: { Row: Depot };
     };
     Views: {
       stock_summary: { Row: StockSummary };
@@ -58,26 +60,27 @@ export const supabase = createClient<{
   };
 }>(supabaseUrl, supabaseKey);
 
-
 // ── Helpers de lectura ────────────────────────────────────────
 
 /** Trae todos los productos para sync inicial */
 export async function fetchAllProducts(): Promise<Product[]> {
   const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('brand', { ascending: true });
+    .from("products")
+    .select("*")
+    .order("brand", { ascending: true });
 
   if (error) throw error;
   return data ?? [];
 }
 
 /** Trae todo el stock de un depósito */
-export async function fetchStockByDepot(depotId: number): Promise<StockEntry[]> {
+export async function fetchStockByDepot(
+  depotId: number,
+): Promise<StockEntry[]> {
   const { data, error } = await supabase
-    .from('stock_entries')
-    .select('*')
-    .eq('depot_id', depotId);
+    .from("stock_entries")
+    .select("*")
+    .eq("depot_id", depotId);
 
   if (error) throw error;
   return data ?? [];
@@ -85,28 +88,31 @@ export async function fetchStockByDepot(depotId: number): Promise<StockEntry[]> 
 
 /** Trae todos los depósitos */
 export async function fetchDepots(): Promise<Depot[]> {
-  const { data, error } = await supabase.from('depots').select('*');
+  const { data, error } = await supabase.from("depots").select("*");
   if (error) throw error;
   return data ?? [];
 }
 
-
 // ── Helpers de escritura ──────────────────────────────────────
 
 /** Agrega o actualiza un lote (upsert por product_id + depot_id + lot_number) */
-export async function upsertStockEntry(entry: Omit<StockEntry, 'id' | 'created_at'>): Promise<void> {
+export async function upsertStockEntry(
+  entry: Omit<StockEntry, "id" | "created_at">,
+): Promise<void> {
   const { error } = await supabase
-    .from('stock_entries')
-    .upsert(entry, { onConflict: 'product_id,depot_id,lot_number' });
+    .from("stock_entries")
+    .upsert(entry, { onConflict: "product_id,depot_id,lot_number" });
 
   if (error) throw error;
 }
 
 /** Inserta productos nuevos en batch */
-export async function insertProducts(products: Omit<Product, 'id' | 'created_at'>[]): Promise<void> {
+export async function insertProducts(
+  products: Omit<Product, "id" | "created_at">[],
+): Promise<void> {
   const { error } = await supabase
-    .from('products')
-    .upsert(products, { onConflict: 'code' });
+    .from("products")
+    .upsert(products, { onConflict: "code" });
 
   if (error) throw error;
 }
@@ -114,12 +120,12 @@ export async function insertProducts(products: Omit<Product, 'id' | 'created_at'
 /** Asigna un depósito a una lista de productos (bulk) */
 export async function assignProductsToDepot(
   productIds: number[],
-  depotId: number | null
+  depotId: number | null,
 ): Promise<void> {
   const { error } = await supabase
-    .from('products')
+    .from("products")
     .update({ depot_id: depotId })
-    .in('id', productIds);
+    .in("id", productIds);
 
   if (error) throw error;
 }

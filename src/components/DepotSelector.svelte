@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { getDepots } from '../lib/idb';
-  import { setActiveDepot } from '../lib/depotStore';
-  import type { Depot } from '../lib/supabase';
+  import { createEventDispatcher } from "svelte";
+  import { getDepots } from "../lib/idb";
+  import { setActiveDepot } from "../lib/depotStore";
+  import type { Depot } from "../lib/supabase";
 
   const dispatch = createEventDispatcher<{ selected: Depot }>();
 
@@ -10,12 +10,11 @@
 
   function choose(depot: Depot) {
     setActiveDepot(depot);
-    dispatch('selected', depot);
+    dispatch("selected", depot);
   }
 </script>
 
 <div class="selector-screen">
-
   <div class="selector-head">
     <div class="logo">⬡ DEPÓSITO</div>
     <p class="subtitle">Seleccioná tu depósito</p>
@@ -26,7 +25,6 @@
       <span class="spin">⟳</span>
       <p>Cargando depósitos...</p>
     </div>
-
   {:else}
     <ul class="depot-list">
       {#each depots as depot}
@@ -38,9 +36,23 @@
           </button>
         </li>
       {/each}
+
+      <!-- Opción especial: productos sin depósito asignado -->
+      <li class="unassigned-sep">
+        <span class="sep-label">Sin asignar</span>
+      </li>
+      <li>
+        <button
+          class="depot-btn unassigned-btn"
+          on:click={() => choose({ id: 0, name: "Sin depósito" })}
+        >
+          <span class="depot-icon unassigned-icon">◌</span>
+          <span class="depot-name">Sin depósito</span>
+          <span class="depot-arrow">→</span>
+        </button>
+      </li>
     </ul>
   {/if}
-
 </div>
 
 <style>
@@ -101,7 +113,10 @@
     border-radius: 12px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      transform 0.1s;
     text-align: left;
   }
 
@@ -152,8 +167,41 @@
     display: inline-block;
   }
 
+  .unassigned-sep {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .sep-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-lo);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+
+  .unassigned-btn {
+    border-style: dashed;
+    opacity: 0.7;
+  }
+
+  .unassigned-btn:active {
+    opacity: 1;
+  }
+
+  .unassigned-icon {
+    color: var(--text-lo);
+  }
+
   @keyframes spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

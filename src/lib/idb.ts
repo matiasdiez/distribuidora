@@ -4,7 +4,7 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 2; // ← bump: agrega índice depot_id en products
+const DB_VERSION = 4; // v4: boxes + expiry_date en stock_entries
 
 export type PendingSync =
   | {
@@ -92,10 +92,26 @@ export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
       }
 
       if (oldVersion < 2) {
+        // Migración v2: índice por depot_id en productos
         const productStore = transaction.objectStore("products");
         if (!productStore.indexNames.contains("by_depot")) {
           productStore.createIndex("by_depot", "depot_id");
         }
+      }
+
+      if (oldVersion < 3) {
+        // Migración v3: columna boxes en stock_entries.
+        // Forzar re-fetch limpiando last_sync.
+        try {
+          transaction.objectStore("meta").delete("last_sync");
+        } catch {}
+      }
+
+      if (oldVersion < 4) {
+        // Migración v4: columna expiry_date. Forzar re-fetch.
+        try {
+          transaction.objectStore("meta").delete("last_sync");
+        } catch {}
       }
     },
   });
@@ -239,29 +255,56 @@ export async function addStockEntry(
   const tx = db.transaction(["stock_entries", "pending_sync"], "readwrite");
 
   if (existing) {
-    // Suma al lote existente
+    // Suma al lote existente; expiry_date se actualiza si se provee una nueva
     const updated = {
       ...existing,
       quantity: existing.quantity + entry.quantity,
+      boxes: (existing.boxes ?? 0) + (entry.boxes ?? 0),
+      expiry_date: entry.expiry_date ?? existing.expiry_date,
     };
     tx.objectStore("stock_entries").put(updated);
   } else {
-    // Lote nuevo
     tx.objectStore("stock_entries").add({
       ...entry,
+      boxes: entry.boxes ?? 0,
+      expiry_date: entry.expiry_date ?? null,
       depot_id: depotId,
       created_at: now,
     });
   }
 
-  // Encola para sync remoto
   tx.objectStore("pending_sync").add({
     type: "stock_upsert",
-    payload: { ...entry, depot_id: depotId },
+    payload: {
+      ...entry,
+      boxes: entry.boxes ?? 0,
+      expiry_date: entry.expiry_date ?? null,
+      depot_id: depotId,
+    },
     created_at: now,
   });
 
   await tx.done;
+}
+
+/** Trae los lotes que vencen dentro de los próximos `days` días */
+export async function getExpiringLots(
+  days: number = 30,
+): Promise<(StockEntry & { local_id?: number })[]> {
+  const db = await getDB();
+  const all = await db.getAll("stock_entries");
+  const limit = new Date();
+  limit.setDate(limit.getDate() + days);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return all.filter((e) => {
+    if (!e.expiry_date) return false;
+    const exp = new Date(e.expiry_date);
+    return (
+      exp >= today && exp <= limit && (e.quantity > 0 || (e.boxes ?? 0) > 0)
+    );
+  });
 }
 
 // ── Depósitos ─────────────────────────────────────────────────

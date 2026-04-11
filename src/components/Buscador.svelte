@@ -1,20 +1,20 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { searchProducts, getCategories } from '../lib/idb';
-  import type { Product } from '../lib/supabase';
+  import { onMount } from "svelte";
+  import { searchProducts, getCategories } from "../lib/idb";
+  import type { Product } from "../lib/supabase";
 
   // Props
-  export let onResults: (products: Product[]) => void       = () => {};
-  export let onCategoryChange: (cat: string) => void        = () => {};
+  export let onResults: (products: Product[]) => void = () => {};
+  export let onCategoryChange: (cat: string) => void = () => {};
   export let isLoading: boolean = false;
 
   // El depósito activo — solo muestra productos asignados a este depósito
   // undefined = mostrar todos (útil para otros contextos)
-  export let depotId: number | undefined = 1;
-  export let query = '';
+  export let depotId: number | "unassigned" | undefined = 1;
+  export let query = "";
 
   let categories: string[] = [];
-  let activeCategory = 'Todos';
+  let activeCategory = "Todos";
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   onMount(async () => {
@@ -26,7 +26,7 @@
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       isLoading = true;
-      const cat = activeCategory === 'Todos' ? undefined : activeCategory;
+      const cat = activeCategory === "Todos" ? undefined : activeCategory;
       const results = await searchProducts(query, cat, depotId);
       onResults(results);
       isLoading = false;
@@ -40,7 +40,7 @@
   }
 
   function clearSearch() {
-    query = '';
+    query = "";
     handleInput();
   }
 </script>
@@ -62,7 +62,11 @@
       on:input={handleInput}
     />
     {#if query}
-      <button class="clear-btn" on:click={clearSearch} aria-label="Limpiar búsqueda">✕</button>
+      <button
+        class="clear-btn"
+        on:click={clearSearch}
+        aria-label="Limpiar búsqueda">✕</button
+      >
     {/if}
   </div>
 
@@ -71,8 +75,8 @@
     <div class="filters" role="group" aria-label="Filtrar por categoría">
       <button
         class="filter-pill"
-        class:active={activeCategory === 'Todos'}
-        on:click={() => selectCategory('Todos')}
+        class:active={activeCategory === "Todos"}
+        on:click={() => selectCategory("Todos")}
       >
         Todos
       </button>
@@ -119,7 +123,9 @@
 
   /* Remover UI nativa del input search en webkit */
   .search-input::-webkit-search-decoration,
-  .search-input::-webkit-search-cancel-button { display: none; }
+  .search-input::-webkit-search-cancel-button {
+    display: none;
+  }
 
   .clear-btn {
     position: absolute;
@@ -146,7 +152,9 @@
     scrollbar-width: none;
   }
 
-  .filters::-webkit-scrollbar { display: none; }
+  .filters::-webkit-scrollbar {
+    display: none;
+  }
 
   .filter-pill {
     flex-shrink: 0;
@@ -161,7 +169,10 @@
     font-weight: 600;
     letter-spacing: 0.02em;
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    transition:
+      border-color 0.15s,
+      color 0.15s,
+      background 0.15s;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -171,5 +182,7 @@
     background: #2a1e00;
   }
 
-  .filter-pill:active { opacity: 0.7; }
+  .filter-pill:active {
+    opacity: 0.7;
+  }
 </style>
