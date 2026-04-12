@@ -146,12 +146,24 @@
           ? 's'
           : ''} por vencer"
       >
-        🔔
-        {#if expiringCount > 0}
-          <span class="bell-badge"
-            >{expiringCount > 9 ? "9+" : expiringCount}</span
-          >
-        {/if}
+        <span class="bell-wrap">
+          {#if expiringCount > 0}
+            <!-- BellRing de Lucide: campanilla con ondas -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+              <path d="M4 2C2.8 3.7 2 5.7 2 8"/>
+              <path d="M20 2c1.2 1.7 2 3.7 2 6"/>
+            </svg>
+            <span class="bell-badge">{expiringCount > 9 ? "9+" : expiringCount}</span>
+          {:else}
+            <!-- Bell de Lucide: campanilla estática -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          {/if}
+        </span>
       </button>
       <ExportCSV {products} {depotId} categoryLabel={activeCategory} />
       <SyncStatus />
@@ -394,24 +406,46 @@
     border-radius: 50%;
     border: 1.5px solid var(--border, #2a2a2a);
     background: var(--bg-card, #1a1a1a);
-    font-size: 17px;
+    color: var(--text-mid, #a0a0a0);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, color 0.15s;
     flex-shrink: 0;
   }
 
   .bell-btn.has-alerts {
     border-color: var(--red, #f87171);
+    color: var(--red, #f87171);
+  }
+
+  .bell-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bell-btn.has-alerts .bell-wrap svg {
+    animation: bell-ring 2.4s ease-in-out infinite;
+    transform-origin: top center;
+  }
+
+  @keyframes bell-ring {
+    0%, 100%  { transform: rotate(0deg); }
+    10%       { transform: rotate(14deg); }
+    20%       { transform: rotate(-12deg); }
+    30%       { transform: rotate(10deg); }
+    40%       { transform: rotate(-8deg); }
+    50%       { transform: rotate(0deg); }
   }
 
   .bell-badge {
     position: absolute;
-    top: -4px;
-    right: -4px;
+    top: -5px;
+    right: -7px;
     min-width: 16px;
     height: 16px;
     padding: 0 3px;
