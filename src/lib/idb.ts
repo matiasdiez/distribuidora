@@ -4,7 +4,7 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 4; // v4: boxes + expiry_date en stock_entries
+const DB_VERSION = 5; // v5: fuerza re-sync para obtener catálogo completo (paginación)
 
 export type PendingSync =
   | {
@@ -117,6 +117,15 @@ export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
         // Migración v4: columna expiry_date. Forzar re-fetch.
         try {
           transaction.objectStore("meta").delete("last_sync");
+        } catch {}
+      }
+
+      if (oldVersion < 5) {
+        // Migración v5: forzar re-sync completo para obtener el catálogo
+        // entero con la nueva función paginada (antes se cortaba en 1000).
+        try {
+          transaction.objectStore("meta").delete("last_sync");
+          transaction.objectStore("meta").delete("initialized");
         } catch {}
       }
     },
