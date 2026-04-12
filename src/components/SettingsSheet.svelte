@@ -51,19 +51,55 @@
 
     creatingDepot = true;
     try {
+      // Intentar crear en Supabase
       const newDepot = await createDepot(name);
-      // Actualizar lista local + IndexedDB
       depots = [...depots, newDepot];
       await saveDepots(depots);
       dispatch('depotsUpdated', depots);
-      // Seleccionar el nuevo depósito automáticamente
       chooseDepot(newDepot);
       showNewDepot = false;
       newDepotName = '';
     } catch (e: any) {
-      createError = e?.message?.includes('unique')
-        ? 'Ya existe un depósito con ese nombre.'
-        : 'Error al crear el depósito. Intentá de nuevo.';
+      console.error('Supabase Error (createDepot):', e);
+
+      if (e?.message?.includes('unique') || e?.code === '23505') {
+        createError = 'Ya existe un depósito con ese nombre.';
+        creatingDepot = false;
+        return;
+      }
+
+      // Fallback offline-first: crear localmente con ID temporal negativo
+      // y encolar para sync cuando haya permisos/conectividad
+      try {
+        const tempId = -(Date.now());
+        const localDepot: Depot = { id: tempId, name };
+        depots = [...depots, localDepot];
+        await saveDepots(depots);
+
+        const { getDB } = await import('../lib/idb');
+        const db = await getDB();
+        await db.add('pending_sync', {
+          type: 'depot_create',
+          payload: { name, temp_id: tempId },
+          created_at: new Date().toISOString(),
+        } as any);
+
+        dispatch('depotsUpdated', depots);
+        chooseDepot(localDepot);
+        showNewDepot = false;
+        newDepotName = '';
+
+        // Mostrar aviso si parece un problema de permisos RLS
+        const isRLS = e?.code === '42501' || e?.status === 403
+          || String(e?.message ?? '').toLowerCase().includes('polic')
+          || String(e?.message ?? '').toLowerCase().includes('violat');
+        if (isRLS) {
+          createError = '⚠ Depósito creado solo localmente. Para sincronizar con el servidor activá el permiso INSERT en la tabla "depots" de Supabase (RLS).';
+        }
+      } catch (localErr) {
+        console.error('Local depot creation also failed:', localErr);
+        createError = `Error al crear: ${e?.message ?? 'desconocido'}. Revisá la consola.`;
+      }
     } finally {
       creatingDepot = false;
     }
@@ -140,7 +176,7 @@
               on:keydown={(e) => e.key === 'Enter' && handleCreateDepot()}
             />
             {#if createError}
-              <p class="new-depot-error">{createError}</p>
+              <p class="new-depot-error" class:is-warning={createError.startsWith('⚠')}>{createError}</p>
             {/if}
             <div class="new-depot-actions">
               <button class="btn-ghost" on:click={toggleNewDepot} disabled={creatingDepot}>
@@ -339,6 +375,11 @@
     background: #2a0a0a;
     border-radius: 4px;
     padding: 6px 10px;
+  }
+
+  .new-depot-error.is-warning {
+    color: var(--amber, #f5a623);
+    background: #1a1200;
   }
 
   .new-depot-actions {

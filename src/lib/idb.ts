@@ -18,6 +18,12 @@ export type PendingSync =
       type: "depot_assignment";
       payload: { product_ids: number[]; depot_id: number | null };
       created_at: string;
+    }
+  | {
+      id?: number;
+      type: "depot_create";
+      payload: { name: string; temp_id: number };
+      created_at: string;
     };
 
 interface DepostioDB {

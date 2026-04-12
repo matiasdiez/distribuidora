@@ -82,7 +82,7 @@
 
   // ── Confirmación ──────────────────────────────────────────────────────────
   async function confirm() {
-    if (!anySelected || targetDepotId == null) return;
+    if (!anySelected || targetDepotId === undefined) return;
     saving = true;
     try {
       const ids = [...selected];

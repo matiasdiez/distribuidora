@@ -62,28 +62,54 @@ export const supabase = createClient<{
 
 // ── Helpers de lectura ────────────────────────────────────────
 
-/** Trae todos los productos para sync inicial */
+/** Trae todos los productos para sync inicial (paginado para superar el límite de 1000 filas de Supabase) */
 export async function fetchAllProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("brand", { ascending: true });
+  const PAGE_SIZE = 1000;
+  let allProducts: Product[] = [];
+  let from = 0;
 
-  if (error) throw error;
-  return data ?? [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("brand", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allProducts = allProducts.concat(data);
+    if (data.length < PAGE_SIZE) break; // última página
+    from += PAGE_SIZE;
+  }
+
+  return allProducts;
 }
 
-/** Trae todo el stock de un depósito */
+/** Trae todo el stock de un depósito (paginado) */
 export async function fetchStockByDepot(
   depotId: number,
 ): Promise<StockEntry[]> {
-  const { data, error } = await supabase
-    .from("stock_entries")
-    .select("*")
-    .eq("depot_id", depotId);
+  const PAGE_SIZE = 1000;
+  let allEntries: StockEntry[] = [];
+  let from = 0;
 
-  if (error) throw error;
-  return data ?? [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("stock_entries")
+      .select("*")
+      .eq("depot_id", depotId)
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allEntries = allEntries.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return allEntries;
 }
 
 /** Trae todos los depósitos */

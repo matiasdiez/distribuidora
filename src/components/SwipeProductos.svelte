@@ -523,7 +523,8 @@
 
 <style>
   .swipe-app {
-    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
     background: var(--bg, #0d0d0d);
     color: var(--text-hi, #f0f0f0);
     font-family: var(--font-ui, sans-serif);

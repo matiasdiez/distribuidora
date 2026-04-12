@@ -118,6 +118,18 @@ export async function syncPending(): Promise<void> {
         const { assignProductsToDepot } = await import('./supabase');
         await assignProductsToDepot(item.payload.product_ids, item.payload.depot_id);
         if (item.id) synced.push(item.id);
+      } else if (item.type === 'depot_create') {
+        const { createDepot } = await import('./supabase');
+        const { saveDepots, getDepots } = await import('./idb');
+        // Crear el depósito en Supabase con el nombre guardado
+        const newDepot = await createDepot(item.payload.name);
+        // Reemplazar el depósito temporal (id negativo) con el ID real
+        const depots = await getDepots();
+        const updated = depots.map(d =>
+          d.id === item.payload.temp_id ? { ...d, id: newDepot.id } : d
+        );
+        await saveDepots(updated);
+        if (item.id) synced.push(item.id);
       }
     } catch (err) {
       console.error('[sync] failed to sync item:', item, err);
