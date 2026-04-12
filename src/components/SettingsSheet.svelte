@@ -2,7 +2,9 @@
   import { createEventDispatcher } from 'svelte';
   import ExportCSV  from './ExportCSV.svelte';
   import { theme, toggleTheme } from '../lib/themeStore';
-  import { setActiveDepot } from '../lib/depotStore';
+  import { setActiveDepot, getAutoEnter, setAutoEnter } from '../lib/depotStore';
+  import { saveDepots } from '../lib/idb';
+  import { createDepot } from '../lib/supabase';
   import type { Product, Depot } from '../lib/supabase';
 
   export let open      = false;
@@ -15,7 +17,57 @@
   const dispatch = createEventDispatcher<{
     close:         void;
     depotSelected: Depot;
+    depotsUpdated: Depot[];
   }>();
+
+  // ── Preferencia auto-enter ───────────────────────────────────
+  let autoEnter = getAutoEnter();
+
+  function toggleAutoEnter() {
+    autoEnter = !autoEnter;
+    setAutoEnter(autoEnter);
+  }
+
+  // ── Crear depósito ────────────────────────────────────────────
+  let showNewDepot  = false;
+  let newDepotName  = '';
+  let creatingDepot = false;
+  let createError   = '';
+
+  function toggleNewDepot() {
+    showNewDepot = !showNewDepot;
+    newDepotName = '';
+    createError  = '';
+  }
+
+  async function handleCreateDepot() {
+    createError = '';
+    const name  = newDepotName.trim();
+    if (!name)                      { createError = 'Escribí un nombre para el depósito.'; return; }
+    if (name.length > 60)           { createError = 'El nombre es demasiado largo.'; return; }
+    if (depots.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+      createError = 'Ya existe un depósito con ese nombre.'; return;
+    }
+
+    creatingDepot = true;
+    try {
+      const newDepot = await createDepot(name);
+      // Actualizar lista local + IndexedDB
+      depots = [...depots, newDepot];
+      await saveDepots(depots);
+      dispatch('depotsUpdated', depots);
+      // Seleccionar el nuevo depósito automáticamente
+      chooseDepot(newDepot);
+      showNewDepot = false;
+      newDepotName = '';
+    } catch (e: any) {
+      createError = e?.message?.includes('unique')
+        ? 'Ya existe un depósito con ese nombre.'
+        : 'Error al crear el depósito. Intentá de nuevo.';
+    } finally {
+      creatingDepot = false;
+    }
+  }
 
   function close() { dispatch('close'); }
 
@@ -63,6 +115,47 @@
             </button>
           {/each}
         </div>
+
+        <!-- Toggle: entrar automáticamente -->
+        <button class="toggle-row" on:click={toggleAutoEnter}>
+          <span class="toggle-label">Entrar automáticamente</span>
+          <span class="toggle-hint">Usa el último depósito al abrir la app</span>
+          <span class="toggle-track" class:on={autoEnter}>
+            <span class="toggle-thumb"></span>
+          </span>
+        </button>
+
+        <!-- Formulario inline para crear depósito -->
+        {#if showNewDepot}
+          <div class="new-depot-form">
+            <input
+              class="new-depot-input"
+              type="text"
+              placeholder="Nombre del depósito"
+              maxlength="60"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="words"
+              bind:value={newDepotName}
+              on:keydown={(e) => e.key === 'Enter' && handleCreateDepot()}
+            />
+            {#if createError}
+              <p class="new-depot-error">{createError}</p>
+            {/if}
+            <div class="new-depot-actions">
+              <button class="btn-ghost" on:click={toggleNewDepot} disabled={creatingDepot}>
+                Cancelar
+              </button>
+              <button class="btn-primary" on:click={handleCreateDepot} disabled={creatingDepot}>
+                {creatingDepot ? 'Creando...' : '✓ Crear'}
+              </button>
+            </div>
+          </div>
+        {:else}
+          <button class="add-depot-btn" on:click={toggleNewDepot}>
+            + Nuevo depósito
+          </button>
+      {/if}
       </section>
 
       <div class="divider"></div>
@@ -133,6 +226,154 @@
     from { transform: translateY(40px); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
   }
+
+  /* ── Toggle ── */
+  .toggle-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 15px;
+    background: var(--bg, #0d0d0d);
+    border: 1.5px solid var(--border, #2a2a2a);
+    border-radius: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    margin-top: 8px;
+    text-align: left;
+    transition: border-color 0.15s;
+  }
+
+  .toggle-row:active { border-color: var(--amber, #f5a623); }
+
+  .toggle-label {
+    font-family: var(--font-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-hi, #f0f0f0);
+    flex: 1;
+    line-height: 1.2;
+  }
+
+  .toggle-hint {
+    display: none;
+  }
+
+  .toggle-track {
+    flex-shrink: 0;
+    width: 44px;
+    height: 26px;
+    border-radius: 13px;
+    background: var(--border-hi, #3a3a3a);
+    position: relative;
+    transition: background 0.22s;
+  }
+
+  .toggle-track.on {
+    background: var(--amber, #f5a623);
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  .toggle-track.on .toggle-thumb {
+    transform: translateX(18px);
+  }
+
+  /* ── Nuevo depósito ── */
+  .add-depot-btn {
+    width: 100%;
+    height: 40px;
+    margin-top: 8px;
+    border-radius: 8px;
+    border: 1.5px dashed var(--border-hi, #3a3a3a);
+    background: transparent;
+    color: var(--text-mid, #a0a0a0);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .add-depot-btn:active {
+    border-color: var(--amber, #f5a623);
+    color: var(--amber, #f5a623);
+  }
+
+  .new-depot-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .new-depot-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    background: var(--bg, #0d0d0d);
+    border: 1.5px solid var(--amber, #f5a623);
+    border-radius: 8px;
+    color: var(--text-hi, #f0f0f0);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 15px;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .new-depot-error {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    color: var(--red, #f87171);
+    background: #2a0a0a;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .new-depot-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-ghost {
+    height: 40px;
+    border-radius: 7px;
+    border: 1px solid var(--border-hi, #3a3a3a);
+    background: var(--bg, #0d0d0d);
+    color: var(--text-mid, #a0a0a0);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 14px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-primary {
+    height: 40px;
+    border-radius: 7px;
+    border: none;
+    background: var(--amber, #f5a623);
+    color: #000;
+    font-family: var(--font-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+  }
+
+  .btn-primary:active { opacity: 0.75; }
 
   /* Handle */
   .sheet-handle {

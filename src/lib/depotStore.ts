@@ -5,10 +5,10 @@
  * el usuario entre directo a su depósito sin pasar por el selector.
  */
 
-import { writable, get } from 'svelte/store';
-import type { Depot } from './supabase';
+import { writable, get } from "svelte/store";
+import type { Depot } from "./supabase";
 
-const STORAGE_KEY = 'active_depot';
+const STORAGE_KEY = "active_depot";
 
 // ── Store ─────────────────────────────────────────────────────
 
@@ -51,4 +51,24 @@ export function clearActiveDepot(): void {
 /** Helper para leer el valor actual del store sincrónicamente */
 export function getActiveDepot(): Depot | null {
   return get(activeDepot);
+}
+
+// ── Preferencia "entrar automáticamente" ─────────────────────
+
+const AUTO_ENTER_KEY = "depot_auto_enter";
+
+/** Lee la preferencia; true = entrar directo si hay depósito guardado */
+export function getAutoEnter(): boolean {
+  try {
+    return localStorage.getItem(AUTO_ENTER_KEY) !== "false"; // default: true
+  } catch {
+    return true;
+  }
+}
+
+/** Guarda la preferencia */
+export function setAutoEnter(value: boolean): void {
+  try {
+    localStorage.setItem(AUTO_ENTER_KEY, value ? "true" : "false");
+  } catch {}
 }

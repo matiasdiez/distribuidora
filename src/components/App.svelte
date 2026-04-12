@@ -16,7 +16,11 @@
     getExpiringLots,
   } from "../lib/idb";
   import { initialSync, initConnectivityListeners } from "../lib/sync";
-  import { loadSavedDepot, setActiveDepot } from "../lib/depotStore";
+  import {
+    loadSavedDepot,
+    setActiveDepot,
+    getAutoEnter,
+  } from "../lib/depotStore";
   import { initTheme } from "../lib/themeStore";
   import type { Product, Depot } from "../lib/supabase";
 
@@ -33,12 +37,14 @@
   let depots: Depot[] = [];
   let depot: Depot | null = null;
   let showSettings = false;
+  let catalogMode = false; // true = buscar en todo el catálogo
   let cleanupListeners: () => void;
   let expiringCount = 0;
   let showExpiring = false;
   let expiringLots: Awaited<ReturnType<typeof getExpiringLots>> = [];
 
   $: depotId = depot?.id === 0 ? ("unassigned" as const) : (depot?.id ?? 1);
+  $: searchDepot = catalogMode ? undefined : depotId;
 
   onMount(async () => {
     initTheme();
@@ -48,7 +54,7 @@
       navigator.serviceWorker.register("/sw.js").catch(console.error);
     }
 
-    depot = loadSavedDepot();
+    depot = getAutoEnter() ? loadSavedDepot() : null;
     depots = await getDepots();
 
     const initialized = await isInitialized();
@@ -83,7 +89,7 @@
   }
 
   function openModal(e: CustomEvent<{ product: Product }>) {
-    if (depotId === "unassigned") return; // sin depósito, no se puede agregar stock
+    if (depotId === "unassigned" || catalogMode) return;
     selectedProduct = e.detail.product;
     modalOpen = true;
   }
@@ -101,6 +107,10 @@
     setActiveDepot(d);
     showSettings = false;
     stockVersion++;
+  }
+
+  function handleDepotsUpdated(updated: Depot[]) {
+    depots = updated;
   }
 </script>
 
@@ -150,18 +160,39 @@
 
   <!-- Contenido principal (con padding para el bottom nav) -->
   <main class="app-main">
+    <!-- Modo de búsqueda -->
+    <div class="scope-pills">
+      <button
+        class="scope-pill"
+        class:active={!catalogMode}
+        on:click={() => {
+          catalogMode = false;
+          stockVersion++;
+        }}>Mi depósito</button
+      >
+      <button
+        class="scope-pill"
+        class:active={catalogMode}
+        on:click={() => {
+          catalogMode = true;
+          stockVersion++;
+        }}>Todo el catálogo</button
+      >
+    </div>
+
     <Buscador
       onResults={handleResults}
       onCategoryChange={handleCategoryChange}
+      depotId={searchDepot}
       bind:isLoading
       bind:query={searchQuery}
     />
 
-    {#key stockVersion + "-" + depotId}
+    {#key stockVersion + "-" + depotId + "-" + catalogMode}
       <ResultsList
         {products}
         {isLoading}
-        {depotId}
+        depotId={searchDepot}
         query={searchQuery}
         on:addStock={openModal}
       />
@@ -237,6 +268,7 @@
     activeDepot={depot}
     on:close={() => (showSettings = false)}
     on:depotSelected={(e) => handleDepotSelected(e.detail)}
+    on:depotsUpdated={(e) => handleDepotsUpdated(e.detail)}
   />
 {/if}
 
@@ -321,6 +353,37 @@
   /* El main necesita espacio para el bottom nav (64px + safe-area) */
   .app-main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--gap));
+  }
+
+  /* ── Scope pills (Mi depósito / Todo el catálogo) ────── */
+  .scope-pills {
+    display: flex;
+    gap: 6px;
+    padding: 8px 0 4px;
+  }
+
+  .scope-pill {
+    flex: 1;
+    height: 34px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border, #2a2a2a);
+    background: var(--bg-card, #1a1a1a);
+    color: var(--text-mid, #a0a0a0);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.15s,
+      color 0.15s,
+      background 0.15s;
+  }
+
+  .scope-pill.active {
+    border-color: var(--amber, #f5a623);
+    color: var(--amber, #f5a623);
+    background: #2a1e00;
   }
 
   /* ── Campana ─────────────────────────────────────────────── */

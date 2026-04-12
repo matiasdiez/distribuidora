@@ -11,7 +11,7 @@
 
   export let products: Product[] = [];
   export let isLoading: boolean = false;
-  export let depotId: number | "unassigned" = 1;
+  export let depotId: number | "unassigned" | undefined = 1;
   export let query: string = "";
 
   const dispatch = createEventDispatcher<{
@@ -42,11 +42,12 @@
       return;
     }
     const t = thresholds!;
-    const dId = depotId; // captura el número para el closure
+    const dId = depotId; // undefined = todos los depósitos (catálogo)
     const entries = await Promise.all(
       list.map(async (p) => {
         const lots = await getStockByProduct(p.id);
-        const depot = lots.filter((l) => l.depot_id === dId);
+        const depot =
+          dId !== undefined ? lots.filter((l) => l.depot_id === dId) : lots;
         const units = depot.reduce((s, l) => s + l.quantity, 0);
         const boxes = depot.reduce((s, l) => s + (l.boxes ?? 0), 0);
 
@@ -111,6 +112,7 @@
         {@const stockEntry = stockCache[product.id] ?? { units: 0, boxes: 0 }}
         {@const hasStock =
           depotId !== "unassigned" &&
+          depotId !== undefined &&
           (stockEntry.units > 0 || stockEntry.boxes > 0)}
         {@const fresh = freshnessCache[product.id]}
 
@@ -135,7 +137,9 @@
 
               <!-- Indicador de stock + frescura -->
               <div class="stock-indicator">
-                {#if depotId === "unassigned"}
+                {#if depotId === undefined}
+                  <span class="badge badge-gray">Catálogo</span>
+                {:else if depotId === "unassigned"}
                   <span class="badge badge-gray">Sin asignar</span>
                 {:else if hasStock}
                   <span class="badge badge-green"
@@ -144,7 +148,7 @@
                 {:else}
                   <span class="badge badge-red">Sin stock</span>
                 {/if}
-                {#if fresh && depotId !== "unassigned"}
+                {#if fresh && depotId !== "unassigned" && depotId !== undefined}
                   <FreshnessDot
                     status={fresh.status}
                     label={fresh.label}
@@ -167,7 +171,7 @@
             <!-- Fila inferior: categoría + botón agregar -->
             <div class="product-bottom">
               <span class="badge badge-blue">{product.category}</span>
-              {#if depotId !== "unassigned"}
+              {#if depotId !== "unassigned" && depotId !== undefined}
                 <button
                   class="add-btn"
                   on:click={() => openModal(product)}

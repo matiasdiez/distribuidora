@@ -29,6 +29,7 @@
   let brands: string[] = [];
   let categories: string[] = [];
   let selectedBrand = "";
+  let catalogMode = false; // true = no filtrar por depósito
   let selectedCategory = "Todos";
   let products: Product[] = []; // productos del brand/filtro activo
   let appReady = false;
@@ -63,7 +64,7 @@
       depots = await getDepots();
       await initialSync();
       thresholds = await loadThresholds();
-      allProducts = await searchProducts("");
+      allProducts = await searchProducts(""); // todos los productos
       buildBrandsAndCategories();
       await computeBrandFreshness();
       appReady = true;
@@ -114,10 +115,13 @@
   let brandSearch = "";
 
   function rebuildBrands() {
-    const source =
+    const catSource =
       selectedCategory === "Todos"
         ? allProducts
         : allProducts.filter((p) => p.category === selectedCategory);
+    const source = catalogMode
+      ? catSource
+      : catSource.filter((p) => p.depot_id === depotId || p.depot_id == null);
     brands = [...new Set(source.map((p) => p.brand))].sort();
   }
 
@@ -136,6 +140,11 @@
     rebuildBrands();
   }
 
+  $: {
+    catalogMode;
+    rebuildBrands();
+  } // recompute brands when mode changes
+
   function selectBrand(brand: string) {
     selectedBrand = brand;
     currentIndex = 0;
@@ -144,7 +153,19 @@
       selectedCategory === "Todos"
         ? allProducts
         : allProducts.filter((p) => p.category === selectedCategory);
-    products = source.filter((p) => p.brand === brand);
+    // En modo catálogo mostramos todos; en modo depósito filtramos
+    const byDepot = catalogMode
+      ? source
+      : source.filter((p) => p.depot_id === depotId || p.depot_id == null);
+    products = byDepot.filter((p) => p.brand === brand);
+  }
+
+  function toggleCatalog() {
+    catalogMode = !catalogMode;
+    selectedBrand = "";
+    products = [];
+    currentIndex = 0;
+    rebuildBrands();
   }
 
   function clearBrand() {
@@ -338,6 +359,24 @@
             aria-label="Limpiar búsqueda">✕</button
           >
         {/if}
+      </div>
+
+      <!-- Scope: mi depósito / todo el catálogo -->
+      <div class="scope-pills">
+        <button
+          class="scope-pill"
+          class:active={!catalogMode}
+          on:click={() => {
+            if (catalogMode) toggleCatalog();
+          }}>Mi depósito</button
+        >
+        <button
+          class="scope-pill"
+          class:active={catalogMode}
+          on:click={() => {
+            if (!catalogMode) toggleCatalog();
+          }}>Todo el catálogo</button
+        >
       </div>
 
       <!-- Filtro de categoría -->
@@ -676,6 +715,37 @@
     text-align: center;
     padding: 32px 16px;
     letter-spacing: 0.04em;
+  }
+
+  .scope-pills {
+    display: flex;
+    gap: 6px;
+    padding: 12px 12px 0;
+    flex-shrink: 0;
+  }
+
+  .scope-pill {
+    flex: 1;
+    height: 32px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border, #2a2a2a);
+    background: var(--bg-card, #1a1a1a);
+    color: var(--text-mid, #a0a0a0);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.15s,
+      color 0.15s,
+      background 0.15s;
+  }
+
+  .scope-pill.active {
+    border-color: var(--amber, #f5a623);
+    color: var(--amber, #f5a623);
+    background: #2a1e00;
   }
 
   .cat-pills {

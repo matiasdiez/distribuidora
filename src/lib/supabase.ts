@@ -93,6 +93,17 @@ export async function fetchDepots(): Promise<Depot[]> {
   return data ?? [];
 }
 
+/** Crea un depósito nuevo; devuelve el objeto creado */
+export async function createDepot(name: string): Promise<Depot> {
+  const { data, error } = await supabase
+    .from("depots")
+    .insert({ name: name.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // ── Helpers de escritura ──────────────────────────────────────
 
 /** Agrega o actualiza un lote (upsert por product_id + depot_id + lot_number) */
