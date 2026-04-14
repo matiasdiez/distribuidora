@@ -1,10 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
-  import { getTotalStock, getStockByProduct } from "../lib/idb";
+  import { getStockByProduct } from "../lib/idb";
   import {
-    loadThresholds,
-    calcFreshness,
-    type FreshnessThresholds,
+    loadThresholds, calcFreshness, type FreshnessThresholds,
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
   import type { Product } from "../lib/supabase";
@@ -14,11 +12,29 @@
   export let depotId: number | "unassigned" | undefined = 1;
   export let query: string = "";
 
-  const dispatch = createEventDispatcher<{
-    addStock: { product: Product };
-  }>();
+  const dispatch = createEventDispatcher<{ addStock: { product: Product } }>();
 
-  let stockCache: Record<number, { units: number; boxes: number }> = {};
+  // ── Paginación virtual: mostrar de a PAGE_SIZE ────────────────
+  const PAGE_SIZE = 50;
+  let visibleCount = PAGE_SIZE;
+  $: visibleProducts = products.slice(0, visibleCount);
+  $: hasMore = products.length > visibleCount;
+
+  function loadMore() {
+    visibleCount = Math.min(visibleCount + PAGE_SIZE, products.length);
+  }
+
+  // Resetear paginación al cambiar la lista de productos
+  $: if (products) { visibleCount = PAGE_SIZE; }
+
+  // ── Cache de stock y frescura ────────────────────────────────
+  type StockInfo = {
+    units: number;
+    boxes: number;
+    noStockConfirmed: boolean; // tiene entrada CONTROL con fecha
+  };
+
+  let stockCache: Record<number, StockInfo> = {};
   let freshnessCache: Record<number, { status: string; label: string }> = {};
   let thresholds: FreshnessThresholds | null = null;
 
@@ -26,14 +42,8 @@
     thresholds = await loadThresholds();
   });
 
-  $: if (products.length > 0 && thresholds) loadCaches(products);
-
-  function formatStock(units: number, boxes: number): string {
-    const parts: string[] = [];
-    if (boxes > 0) parts.push(`${boxes} caja${boxes !== 1 ? "s" : ""}`);
-    if (units > 0 || !boxes) parts.push(`${units} u.`);
-    return parts.join(" + ");
-  }
+  // Solo cargar la porción visible para no bloquear el hilo principal
+  $: if (visibleProducts.length > 0 && thresholds) loadCaches(visibleProducts);
 
   async function loadCaches(list: Product[]) {
     if (depotId === "unassigned") {
@@ -42,35 +52,55 @@
       return;
     }
     const t = thresholds!;
-    const dId = depotId; // undefined = todos los depósitos (catálogo)
-    const entries = await Promise.all(
-      list.map(async (p) => {
-        const lots = await getStockByProduct(p.id);
-        const depot =
-          dId !== undefined ? lots.filter((l) => l.depot_id === dId) : lots;
-        const units = depot.reduce((s, l) => s + l.quantity, 0);
-        const boxes = depot.reduce((s, l) => s + (l.boxes ?? 0), 0);
+    const dId = depotId;
 
-        const latest =
-          depot.length > 0
-            ? depot
-                .map((l) => new Date(l.created_at))
-                .sort((a, b) => b.getTime() - a.getTime())[0]
+    // Procesar en lotes de 20 para no bloquear el event loop
+    const CHUNK = 20;
+    for (let i = 0; i < list.length; i += CHUNK) {
+      const chunk = list.slice(i, i + CHUNK);
+      const entries = await Promise.all(
+        chunk.map(async (p) => {
+          const lots = await getStockByProduct(p.id);
+          const depot = dId !== undefined ? lots.filter(l => l.depot_id === dId) : lots;
+
+          const realLots = depot.filter(l => l.lot_number !== "CONTROL");
+          const controlLot = depot.find(l => l.lot_number === "CONTROL");
+
+          const units = realLots.reduce((s, l) => s + l.quantity, 0);
+          const boxes = realLots.reduce((s, l) => s + (l.boxes ?? 0), 0);
+          const noStockConfirmed = !!(controlLot);
+
+          const latest = depot.length > 0
+            ? depot.map(l => new Date(l.created_at)).sort((a, b) => b.getTime() - a.getTime())[0]
             : null;
-        const fresh = calcFreshness(latest, t);
+          const fresh = calcFreshness(latest, t);
 
-        return [p.id, { units, boxes, fresh }] as const;
-      }),
-    );
+          return [p.id, { units, boxes, noStockConfirmed, fresh }] as const;
+        }),
+      );
 
-    const sc: Record<number, { units: number; boxes: number }> = {};
-    const fc: Record<number, { status: string; label: string }> = {};
-    for (const [id, { units, boxes, fresh }] of entries) {
-      sc[id] = { units, boxes };
-      fc[id] = { status: fresh.status, label: fresh.label };
+      // Actualizar los cachés de forma reactiva luego de cada chunk
+      const sc = { ...stockCache };
+      const fc = { ...freshnessCache };
+      for (const [id, { units, boxes, noStockConfirmed, fresh }] of entries) {
+        sc[id] = { units, boxes, noStockConfirmed };
+        fc[id] = { status: fresh.status, label: fresh.label };
+      }
+      stockCache = sc;
+      freshnessCache = fc;
+
+      // Ceder al event loop entre chunks (permite que el input responda)
+      if (i + CHUNK < list.length) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
-    stockCache = sc;
-    freshnessCache = fc;
+  }
+
+  function formatStock(units: number, boxes: number): string {
+    const parts: string[] = [];
+    if (boxes > 0) parts.push(`${boxes} caja${boxes !== 1 ? "s" : ""}`);
+    if (units > 0 || !boxes) parts.push(`${units} u.`);
+    return parts.join(" + ");
   }
 
   function openModal(product: Product) {
@@ -102,80 +132,66 @@
     </div>
   {:else}
     <div class="results-header">
-      <span class="results-count"
-        >{products.length} resultado{products.length !== 1 ? "s" : ""}</span
-      >
+      <span class="results-count">
+        {products.length} resultado{products.length !== 1 ? "s" : ""}
+        {#if hasMore}
+          <span class="results-shown"> — mostrando {visibleCount}</span>
+        {/if}
+      </span>
     </div>
 
     <div class="product-list">
-      {#each products as product (product.id)}
-        {@const stockEntry = stockCache[product.id] ?? { units: 0, boxes: 0 }}
-        {@const hasStock =
-          depotId !== "unassigned" &&
-          depotId !== undefined &&
-          (stockEntry.units > 0 || stockEntry.boxes > 0)}
+      {#each visibleProducts as product (product.id)}
+        {@const stockEntry = stockCache[product.id] ?? { units: 0, boxes: 0, noStockConfirmed: false }}
+        {@const hasStock = depotId !== "unassigned" && depotId !== undefined && (stockEntry.units > 0 || stockEntry.boxes > 0)}
         {@const fresh = freshnessCache[product.id]}
 
         <div class="product-card" class:has-stock={hasStock}>
-          <!-- Barra lateral de estado -->
-          <div
-            class="status-bar"
-            class:stock-ok={hasStock}
-            class:stock-no={!hasStock}
-          ></div>
+          <!-- Barra lateral -->
+          <div class="status-bar" class:stock-ok={hasStock} class:stock-no={!hasStock}></div>
 
-          <!-- Contenido principal -->
           <div class="product-body">
             <div class="product-top">
-              <!-- Marca + código -->
               <div class="product-meta">
-                <span class="product-brand">
-                  {@html highlight(product.brand, query)}
-                </span>
+                <span class="product-brand">{@html highlight(product.brand, query)}</span>
                 <span class="product-code">{product.code}</span>
               </div>
 
-              <!-- Indicador de stock + frescura -->
+              <!-- Indicador de stock -->
               <div class="stock-indicator">
                 {#if depotId === undefined}
                   <span class="badge badge-gray">Catálogo</span>
                 {:else if depotId === "unassigned"}
                   <span class="badge badge-gray">Sin asignar</span>
                 {:else if hasStock}
-                  <span class="badge badge-green"
-                    >{formatStock(stockEntry.units, stockEntry.boxes)}</span
-                  >
-                {:else}
+                  <span class="badge badge-green">{formatStock(stockEntry.units, stockEntry.boxes)}</span>
+                {:else if stockEntry.noStockConfirmed}
+                  <!-- Confirmado sin stock → rojo -->
                   <span class="badge badge-red">Sin stock</span>
+                {:else}
+                  <!-- Sin stock y sin chequeo confirmado → gris -->
+                  <span class="badge badge-gray badge-unchecked">Sin stock</span>
                 {/if}
                 {#if fresh && depotId !== "unassigned" && depotId !== undefined}
-                  <FreshnessDot
-                    status={fresh.status}
-                    label={fresh.label}
-                    size="sm"
-                  />
+                  <FreshnessDot status={fresh.status} label={fresh.label} size="sm" />
                 {/if}
               </div>
             </div>
 
-            <!-- Descripción del producto -->
             <div class="product-desc">
-              <span class="product-name">
-                {@html highlight(product.description, query)}
-              </span>
+              <span class="product-name">{@html highlight(product.description, query)}</span>
               {#if product.weight_qty}
                 <span class="product-weight">{product.weight_qty}</span>
               {/if}
             </div>
 
-            <!-- Fila inferior: categoría + botón agregar -->
             <div class="product-bottom">
               <span class="badge badge-blue">{product.category}</span>
               {#if depotId !== "unassigned" && depotId !== undefined}
                 <button
                   class="add-btn"
                   on:click={() => openModal(product)}
-                  aria-label="Agregar stock de {product.brand} {product.description}"
+                  aria-label="Actualizar stock de {product.brand} {product.description}"
                 >
                   + Stock
                 </button>
@@ -185,176 +201,75 @@
         </div>
       {/each}
     </div>
+
+    <!-- Botón "Ver más" para paginación -->
+    {#if hasMore}
+      <div class="load-more-wrap">
+        <button class="load-more-btn" on:click={loadMore}>
+          Ver más ({products.length - visibleCount} restantes)
+        </button>
+      </div>
+    {/if}
   {/if}
 </div>
 
 <style>
-  .results {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
+  .results { display: flex; flex-direction: column; gap: 0; }
+  .results-header { padding: 4px 2px 8px; }
+  .results-count { font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo, #555); }
+  .results-shown { font-weight: 400; }
 
-  .results-header {
-    padding: 4px 2px 8px;
-  }
+  .product-list { display: flex; flex-direction: column; gap: 8px; }
 
-  .results-count {
-    font-family: var(--font-mono, monospace);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-lo, #555);
-  }
+  .product-card { display: flex; background: var(--bg-card, #1a1a1a); border: 1px solid var(--border, #2a2a2a); border-radius: var(--radius, 6px); overflow: hidden; transition: border-color 0.15s; }
+  .product-card.has-stock { border-color: #1c3a28; }
 
-  /* Lista de productos */
-  .product-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+  .status-bar { width: 4px; flex-shrink: 0; }
+  .stock-ok { background: var(--green, #4ade80); }
+  .stock-no { background: var(--border, #2a2a2a); }
 
-  /* Card individual */
-  .product-card {
-    display: flex;
-    background: var(--bg-card, #1a1a1a);
-    border: 1px solid var(--border, #2a2a2a);
-    border-radius: var(--radius, 6px);
-    overflow: hidden;
-    transition: border-color 0.15s;
-  }
+  .product-body { flex: 1; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
-  .product-card.has-stock {
-    border-color: #1c3a28;
-  }
+  .product-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .product-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
-  /* Barra lateral de color */
-  .status-bar {
-    width: 4px;
-    flex-shrink: 0;
-  }
+  .product-brand { font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 700; color: var(--amber, #f5a623); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .product-code { font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-lo, #555); white-space: nowrap; }
 
-  .stock-ok {
-    background: var(--green, #4ade80);
-  }
-  .stock-no {
-    background: var(--border, #2a2a2a);
-  }
+  .product-desc { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .product-name { font-family: var(--font-ui, sans-serif); font-size: 18px; font-weight: 600; color: var(--text-hi, #f0f0f0); line-height: 1.2; }
+  .product-weight { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-mid, #a0a0a0); white-space: nowrap; }
 
-  /* Body */
-  .product-body {
-    flex: 1;
-    padding: 12px 12px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
+  .product-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
 
-  /* Fila top */
-  .product-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .product-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .product-brand {
-    font-family: var(--font-mono, monospace);
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--amber, #f5a623);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
-
-  .product-code {
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    color: var(--text-lo, #555);
-    white-space: nowrap;
-  }
-
-  /* Descripción */
-  .product-desc {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .product-name {
-    font-family: var(--font-ui, sans-serif);
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-hi, #f0f0f0);
-    line-height: 1.2;
-  }
-
-  .product-weight {
-    font-family: var(--font-mono, monospace);
-    font-size: 12px;
-    color: var(--text-mid, #a0a0a0);
-    white-space: nowrap;
-  }
-
-  /* Fila inferior */
-  .product-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 2px;
-  }
-
-  /* Botón agregar stock */
   .add-btn {
-    height: 34px;
-    padding: 0 14px;
-    border-radius: 5px;
-    border: 1.5px solid var(--amber-dim, #b57a1a);
-    background: #1a1200;
-    color: var(--amber, #f5a623);
-    font-family: var(--font-ui, sans-serif);
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s;
+    height: 34px; padding: 0 14px; border-radius: 5px;
+    border: 1.5px solid var(--amber-dim, #b57a1a); background: #1a1200;
+    color: var(--amber, #f5a623); font-family: var(--font-ui, sans-serif);
+    font-size: 14px; font-weight: 700; letter-spacing: 0.03em;
+    cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s;
   }
+  .add-btn:active { background: #2a1e00; }
 
-  .add-btn:active {
-    background: #2a1e00;
-  }
+  /* Badges */
+  .stock-indicator { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
 
-  /* Resaltado de búsqueda */
-  .badge-gray {
-    background: var(--bg, #0d0d0d);
-    color: var(--text-lo, #555);
-    border: 1px solid var(--border, #2a2a2a);
-  }
+  .badge-gray { background: var(--bg, #0d0d0d); color: var(--text-lo, #555); border: 1px solid var(--border, #2a2a2a); }
 
-  :global(mark) {
-    background: #2a1e00;
-    color: var(--amber, #f5a623);
-    border-radius: 2px;
-    padding: 0 1px;
-  }
+  /* Sin stock sin confirmar: gris apagado, sin borde */
+  .badge-unchecked { opacity: 0.6; font-style: italic; }
 
-  /* Indicador de stock */
-  .stock-indicator {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  :global(mark) { background: #2a1e00; color: var(--amber, #f5a623); border-radius: 2px; padding: 0 1px; }
+
+  /* Cargar más */
+  .load-more-wrap { padding: 16px 0 8px; display: flex; justify-content: center; }
+  .load-more-btn {
+    height: 40px; padding: 0 24px; border-radius: 20px;
+    border: 1.5px solid var(--border-hi, #3a3a3a); background: var(--bg-card, #1a1a1a);
+    color: var(--text-mid, #a0a0a0); font-family: var(--font-mono, monospace);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, color 0.15s;
   }
+  .load-more-btn:hover, .load-more-btn:active { border-color: var(--amber, #f5a623); color: var(--amber, #f5a623); }
 </style>

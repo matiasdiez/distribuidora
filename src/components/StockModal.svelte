@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import { addStockEntry, getStockByProduct, getDepots } from "../lib/idb";
+  import { addStockEntry, getStockByProduct, confirmNoStock } from "../lib/idb";
   import type { Product, StockEntry } from "../lib/supabase";
 
   export let product: Product | null = null;
@@ -12,118 +12,170 @@
     saved: { product_id: number };
   }>();
 
-  let lotNumber = "";
-  let quantity = "";
-  let boxes = "";
-  let expiryRaw = ""; // "MMYY" que el usuario tipea
-  let notes = "";
+  // ── Formulario ───────────────────────────────────────────────
+  let lotNumber  = "";
+  let quantity   = "";
+  let boxes      = "";
+  let expiryRaw  = "";
+  let notes      = "";
+  let editingLot: StockEntry | null = null;
 
-  // Formatea MMYY → "MM/YY" para display; devuelve '' si está incompleto
+  /**
+   * Modo de operación:
+   *  'add' → RECEPCIÓN: el operario ingresa cuánto LLEGÓ (delta).
+   *           La app suma al total existente.
+   *  'set' → INVENTARIO: el operario ingresa lo que VE en el estante (absoluto).
+   *           La app reemplaza el total.
+   * Para lotes nuevos ambos modos son equivalentes.
+   */
+  let mode: 'add' | 'set' = 'add';
+
+  // ── Estado ───────────────────────────────────────────────────
+  let existingLots: StockEntry[] = [];
+  let saving = false;
+  let confirmingNoStock = false;
+  let error = "";
+  let noStockConfirmed = false;
+
+  // ── Lotes del depósito (sin CONTROL) ────────────────────────
+  $: lotsInDepot  = existingLots.filter(l => l.depot_id === depotId && l.lot_number !== "CONTROL");
+  $: totalUnits   = lotsInDepot.reduce((s, l) => s + l.quantity, 0);
+  $: totalBoxes   = lotsInDepot.reduce((s, l) => s + (l.boxes ?? 0), 0);
+  $: hasRealStock = totalUnits > 0 || totalBoxes > 0;
+
+  // Valores actuales del lote que se está editando
+  $: currentLotUnits = editingLot?.quantity ?? 0;
+  $: currentLotBoxes = editingLot?.boxes    ?? 0;
+
+  // Preview del resultado según modo
+  $: previewUnits = (() => {
+    const qty = parseInt(quantity, 10) || 0;
+    if (!editingLot) return qty;
+    return mode === 'add' ? currentLotUnits + qty : qty;
+  })();
+  $: previewBoxes = (() => {
+    const bxs = parseInt(boxes, 10) || 0;
+    if (!editingLot) return bxs;
+    return mode === 'add' ? currentLotBoxes + bxs : bxs;
+  })();
+
+  // ── Vencimiento ──────────────────────────────────────────────
   $: expiryDisplay =
     expiryRaw.length >= 2
-      ? expiryRaw.slice(0, 2) +
-        (expiryRaw.length > 2 ? "/" + expiryRaw.slice(2) : "")
+      ? expiryRaw.slice(0, 2) + (expiryRaw.length > 2 ? "/" + expiryRaw.slice(2) : "")
       : expiryRaw;
 
-  // MMYY → "20YY-MM-DD" (último día del mes)
   function expiryToISO(raw: string): string | null {
     if (raw.length !== 4) return null;
     const mm = parseInt(raw.slice(0, 2), 10);
     const yy = parseInt(raw.slice(2, 4), 10);
     if (mm < 1 || mm > 12) return null;
     const year = 2000 + yy;
-    // Último día del mes
     const last = new Date(year, mm, 0).getDate();
     return `${year}-${String(mm).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
   }
-
-  // Manejar escritura libre en el campo de vencimiento
   function handleExpiryInput(e: Event) {
-    const val = (e.target as HTMLInputElement).value
-      .replace(/\D/g, "")
-      .slice(0, 4);
-    expiryRaw = val;
+    expiryRaw = (e.target as HTMLInputElement).value.replace(/\D/g, "").slice(0, 4);
   }
-
-  // Cuando el usuario usa el date picker nativo
   function handleExpiryPicker(e: Event) {
-    const iso = (e.target as HTMLInputElement).value; // "YYYY-MM-DD"
-    if (!iso) {
-      expiryRaw = "";
-      return;
-    }
+    const iso = (e.target as HTMLInputElement).value;
+    if (!iso) { expiryRaw = ""; return; }
     const [, mm] = iso.split("-");
-    const yy = iso.slice(2, 4);
-    expiryRaw = mm + yy;
+    expiryRaw = mm + iso.slice(2, 4);
   }
+  $: pickerValue = (() => { const iso = expiryToISO(expiryRaw); return iso ?? ""; })();
 
-  // ISO actual del picker para pre-llenarlo cuando expiryRaw es válido
-  $: pickerValue = (() => {
-    const iso = expiryToISO(expiryRaw);
-    return iso ?? "";
-  })();
-  let existingLots: StockEntry[] = [];
-  let saving = false;
-  let error = "";
+  // ── Ciclo de vida ────────────────────────────────────────────
+  $: if (open && product) { loadLots(); resetForm(); }
 
-  // Cargar lotes existentes cuando se abre el modal
-  $: if (open && product) {
-    loadLots();
-    lotNumber = "";
-    quantity = "";
-    boxes = "";
-    expiryRaw = "";
-    notes = "";
-    error = "";
+  function resetForm() {
+    lotNumber  = "";
+    quantity   = "";
+    boxes      = "";
+    expiryRaw  = "";
+    notes      = "";
+    editingLot = null;
+    mode       = 'add';
+    error      = "";
   }
 
   async function loadLots() {
     if (!product) return;
     existingLots = await getStockByProduct(product.id);
+    noStockConfirmed = existingLots.some(
+      l => l.depot_id === depotId && l.lot_number === "CONTROL"
+    );
   }
 
+  /** Carga el formulario con los valores del lote a editar */
+  function startEditLot(lot: StockEntry) {
+    editingLot = lot;
+    lotNumber  = lot.lot_number;
+    notes      = lot.notes ?? "";
+    mode       = 'add'; // por defecto recepción (la operación más frecuente)
+    // Recepción arranca en vacío: el operario ingresa cuánto llegó (delta)
+    quantity   = "";
+    boxes      = "";
+    if (lot.expiry_date) {
+      const [y, m] = lot.expiry_date.split("-");
+      expiryRaw = m + y.slice(2);
+    } else {
+      expiryRaw = "";
+    }
+    error = "";
+  }
+
+  /**
+   * Rellena los campos con los valores actuales del lote.
+   * Se usa al cambiar a modo Inventario para que el operario
+   * parta del stock real y solo corrija lo que cambió.
+   */
+  function fillWithCurrentLot() {
+    if (!editingLot) return;
+    quantity = String(editingLot.quantity);
+    boxes    = String(editingLot.boxes ?? 0);
+  }
+
+  // ── Guardar ──────────────────────────────────────────────────
   async function save() {
     if (!product) return;
     error = "";
 
     const qty = parseInt(quantity, 10) || 0;
-    const bxs = parseInt(boxes, 10) || 0;
+    const bxs = parseInt(boxes,    10) || 0;
 
     if (!lotNumber.trim()) {
-      error = "Ingresá el número de lote.";
-      return;
+      error = "Ingresá el número de lote."; return;
     }
-    if (qty < 0) {
-      error = "Las unidades no pueden ser negativas.";
-      return;
+    if (qty < 0 || bxs < 0) {
+      error = "Los valores no pueden ser negativos."; return;
     }
-    if (bxs < 0) {
-      error = "Las cajas no pueden ser negativas.";
-      return;
-    }
-    if (qty === 0 && bxs === 0) {
-      error = "Ingresá al menos 1 unidad o 1 caja.";
-      return;
+    // Lote nuevo: siempre requiere al menos 1 unidad o caja.
+    // Lote existente en modo recepción: sumar 0 no tiene sentido.
+    // Lote existente en modo inventario: se permite 0 (el operario contó 0).
+    const allowZero = !!editingLot && mode === 'set';
+    if (!allowZero && qty === 0 && bxs === 0) {
+      error = "Ingresá al menos 1 unidad o 1 caja."; return;
     }
     const expiryISO = expiryRaw ? expiryToISO(expiryRaw) : null;
     if (expiryRaw && !expiryISO) {
-      error = "Fecha de vencimiento inválida. Usá el formato MM/AA.";
-      return;
+      error = "Fecha de vencimiento inválida. Usá MM/AA."; return;
     }
 
     saving = true;
     try {
       await addStockEntry(
         {
-          product_id: product.id,
-          depot_id: depotId,
-          lot_number: lotNumber.trim().toUpperCase(),
-          quantity: qty,
-          boxes: bxs,
+          product_id:  product.id,
+          depot_id:    depotId,
+          lot_number:  lotNumber.trim().toUpperCase(),
+          quantity:    qty,
+          boxes:       bxs,
           expiry_date: expiryISO,
-          notes: notes.trim() || null,
+          notes:       notes.trim() || null,
         },
         depotId,
+        mode,
       );
       dispatch("saved", { product_id: product.id });
       close();
@@ -135,112 +187,141 @@
     }
   }
 
-  function close() {
-    dispatch("close");
+  async function handleConfirmNoStock() {
+    if (!product) return;
+    confirmingNoStock = true;
+    try {
+      await confirmNoStock(product.id, depotId);
+      dispatch("saved", { product_id: product.id });
+      close();
+    } catch (e) {
+      error = "Error al confirmar. Intentá de nuevo.";
+      console.error(e);
+    } finally {
+      confirmingNoStock = false;
+    }
   }
 
-  function handleBackdrop(e: MouseEvent) {
-    if (e.target === e.currentTarget) close();
-  }
+  function close() { dispatch("close"); }
+  function handleBackdrop(e: MouseEvent) { if (e.target === e.currentTarget) close(); }
 
   function formatExpiry(iso: string): string {
     const [y, m] = iso.split("-");
     return `${m}/${y.slice(2)}`;
   }
-
   function daysUntil(iso: string): number {
     return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
   }
-
-  // Totales actuales de este producto en el depósito
-  $: lotsInDepot = existingLots.filter((l) => l.depot_id === depotId);
-  $: totalUnits = lotsInDepot.reduce((s, l) => s + l.quantity, 0);
-  $: totalBoxes = lotsInDepot.reduce((s, l) => s + (l.boxes ?? 0), 0);
-
-  function formatStockLabel(units: number, bxs: number): string {
+  function formatQty(units: number, bxs: number): string {
     const parts: string[] = [];
-    if (bxs > 0) parts.push(`${bxs} caja${bxs !== 1 ? "s" : ""}`);
-    if (units > 0 || !bxs) parts.push(`${units} unidades`);
+    if (bxs > 0)            parts.push(`${bxs} caja${bxs !== 1 ? "s" : ""}`);
+    if (units > 0 || !bxs)  parts.push(`${units} u.`);
     return parts.join(" + ");
   }
 </script>
 
 {#if open && product}
-  <!-- Backdrop -->
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="backdrop" on:click={handleBackdrop}>
-    <div
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Agregar stock"
-    >
-      <!-- Header del modal -->
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Stock">
+
+      <!-- ── Header ──────────────────────────────────────────── -->
       <div class="modal-header">
         <div class="modal-title-wrap">
           <span class="modal-brand">{product.brand}</span>
           <span class="modal-desc">{product.description}</span>
-          {#if product.weight_qty}
-            <span class="modal-weight">{product.weight_qty}</span>
-          {/if}
+          {#if product.weight_qty}<span class="modal-weight">{product.weight_qty}</span>{/if}
           {#if product.price}
             <span class="modal-price">
-              $ {product.price.toLocaleString("es-AR", {
-                minimumFractionDigits: 2,
-              })}
+              $ {product.price.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
             </span>
           {/if}
         </div>
-        <button class="close-btn" on:click={close} aria-label="Cerrar">✕</button
-        >
+        <button class="close-btn" on:click={close} aria-label="Cerrar">✕</button>
       </div>
 
-      <!-- Lotes existentes -->
-      {#if existingLots.length > 0}
+      <!-- ── Lotes existentes ────────────────────────────────── -->
+      {#if lotsInDepot.length > 0}
         <div class="lots-section">
           <p class="section-label">
-            Stock actual — {formatStockLabel(totalUnits, totalBoxes)}
+            Stock actual — {formatQty(totalUnits, totalBoxes)}
           </p>
           <div class="lots-list">
-            {#each existingLots.filter((l) => l.depot_id === depotId) as lot}
-              <div class="lot-row">
+            {#each lotsInDepot as lot}
+              <button
+                class="lot-row"
+                class:editing={editingLot?.id === lot.id}
+                on:click={() => startEditLot(lot)}
+                title="Tocar para actualizar este lote"
+              >
                 <span class="lot-number">{lot.lot_number}</span>
-                <span class="lot-qty">
-                  {#if (lot.boxes ?? 0) > 0}
-                    {lot.boxes} caja{lot.boxes !== 1 ? "s" : ""}
-                    {#if lot.quantity > 0}
-                      + {lot.quantity} u.{/if}
-                  {:else}
-                    {lot.quantity} u.
-                  {/if}
-                </span>
+                <span class="lot-qty">{formatQty(lot.quantity, lot.boxes ?? 0)}</span>
                 <span class="lot-date">
                   {#if lot.expiry_date}
-                    <span
-                      class="lot-expiry"
-                      class:expiry-soon={daysUntil(lot.expiry_date) <= 30}
-                    >
+                    <span class="lot-expiry" class:expiry-soon={daysUntil(lot.expiry_date) <= 30}>
                       vence {formatExpiry(lot.expiry_date)}
                     </span>
                   {:else}
-                    {new Date(lot.created_at).toLocaleDateString("es-AR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}
+                    {new Date(lot.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}
                   {/if}
                 </span>
-              </div>
+                <span class="lot-edit-hint">✏</span>
+              </button>
             {/each}
           </div>
         </div>
         <div class="divider"></div>
       {/if}
 
-      <!-- Formulario -->
+      <!-- ── Formulario ──────────────────────────────────────── -->
       <div class="modal-body">
-        <p class="section-label">Agregar entrada</p>
 
+        <!-- Título del formulario + botón nueva entrada -->
+        <div class="form-header-row">
+          <p class="section-label">
+            {editingLot ? `Actualizando lote ${editingLot.lot_number}` : "Nuevo lote"}
+          </p>
+          {#if editingLot}
+            <button class="new-entry-btn" on:click={resetForm}>+ Nuevo lote</button>
+          {/if}
+        </div>
+
+        <!-- ── Selector de modo (solo para lotes existentes) ── -->
+        {#if editingLot}
+          <div class="mode-selector">
+            <button
+              class="mode-btn"
+              class:active={mode === 'add'}
+              on:click={() => { mode = 'add'; quantity = ""; boxes = ""; }}
+            >
+              <span class="mode-icon">📦</span>
+              <span class="mode-label">Recepción</span>
+              <span class="mode-desc">Llegó mercadería — suma al stock</span>
+            </button>
+            <button
+              class="mode-btn"
+              class:active={mode === 'set'}
+              on:click={() => { mode = 'set'; fillWithCurrentLot(); }}
+            >
+              <span class="mode-icon">🔍</span>
+              <span class="mode-label">Inventario</span>
+              <span class="mode-desc">Conteo real — reemplaza el stock</span>
+            </button>
+          </div>
+
+          <!-- Stock actual del lote seleccionado -->
+          <div class="current-lot-info">
+            <span class="current-lot-label">
+              {mode === 'add' ? 'Stock actual del lote' : 'Stock actual del lote'}
+            </span>
+            <span class="current-lot-value">
+              {formatQty(currentLotUnits, currentLotBoxes)}
+            </span>
+          </div>
+        {/if}
+
+        <!-- Nro. de lote -->
         <div class="field-group">
           <label class="field-label" for="lot-input">Nro. de lote</label>
           <input
@@ -253,13 +334,17 @@
             autocapitalize="characters"
             placeholder="Ej: L2024-001"
             bind:value={lotNumber}
+            readonly={!!editingLot}
+            class:input-readonly={!!editingLot}
           />
         </div>
 
-        <!-- Fila unidades + cajas en paralelo -->
+        <!-- Unidades + Cajas -->
         <div class="qty-row">
           <div class="field-group">
-            <label class="field-label" for="qty-input">Unidades</label>
+            <label class="field-label" for="qty-input">
+              {#if editingLot && mode === 'add'}Unidades a sumar{:else if editingLot}Total unidades{:else}Unidades{/if}
+            </label>
             <input
               id="qty-input"
               class="input-field qty-input"
@@ -271,7 +356,9 @@
             />
           </div>
           <div class="field-group">
-            <label class="field-label" for="boxes-input">Cajas</label>
+            <label class="field-label" for="boxes-input">
+              {#if editingLot && mode === 'add'}Cajas a sumar{:else if editingLot}Total cajas{:else}Cajas{/if}
+            </label>
             <input
               id="boxes-input"
               class="input-field qty-input"
@@ -284,11 +371,37 @@
           </div>
         </div>
 
-        <!-- Fecha de vencimiento -->
+        <!-- Preview del resultado (solo al editar) -->
+        {#if editingLot && (parseInt(quantity,10) > 0 || parseInt(boxes,10) > 0)}
+          <div class="preview-row" class:preview-add={mode === 'add'} class:preview-set={mode === 'set'}>
+            {#if mode === 'add'}
+              <span class="preview-label">Resultado</span>
+              <span class="preview-formula">
+                {formatQty(currentLotUnits, currentLotBoxes)}
+                +
+                {formatQty(parseInt(quantity,10)||0, parseInt(boxes,10)||0)}
+                =
+              </span>
+              <span class="preview-value">{formatQty(previewUnits, previewBoxes)}</span>
+            {:else}
+              <span class="preview-label">Nuevo total</span>
+              <span class="preview-value">{formatQty(previewUnits, previewBoxes)}</span>
+              {#if previewUnits < currentLotUnits || previewBoxes < currentLotBoxes}
+                <span class="preview-diff preview-down">
+                  ↓ baja de {formatQty(currentLotUnits, currentLotBoxes)}
+                </span>
+              {:else if previewUnits > currentLotUnits || previewBoxes > currentLotBoxes}
+                <span class="preview-diff preview-up">
+                  ↑ sube de {formatQty(currentLotUnits, currentLotBoxes)}
+                </span>
+              {/if}
+            {/if}
+          </div>
+        {/if}
+
+        <!-- Vencimiento -->
         <div class="field-group">
-          <label class="field-label" for="expiry-input"
-            >Vencimiento (MM/AA)</label
-          >
+          <label class="field-label" for="expiry-input">Vencimiento (MM/AA)</label>
           <div class="expiry-wrap">
             <input
               id="expiry-input"
@@ -301,7 +414,6 @@
               on:input={handleExpiryInput}
               autocomplete="off"
             />
-            <!-- Date picker nativo: abre calendario al tocar el ícono -->
             <label class="expiry-picker-btn" title="Elegir fecha">
               📅
               <input
@@ -314,6 +426,7 @@
           </div>
         </div>
 
+        <!-- Notas -->
         <div class="field-group">
           <label class="field-label" for="notes-input">Notas (opcional)</label>
           <input
@@ -331,289 +444,195 @@
         {/if}
       </div>
 
-      <!-- Acciones -->
+      <!-- ── Footer ──────────────────────────────────────────── -->
       <div class="modal-footer">
-        <button class="btn btn-ghost" on:click={close} disabled={saving}>
+        <button class="btn btn-ghost" on:click={close} disabled={saving || confirmingNoStock}>
           Cancelar
         </button>
+
+        {#if !hasRealStock}
+          <button
+            class="btn btn-no-stock"
+            class:confirmed={noStockConfirmed}
+            on:click={handleConfirmNoStock}
+            disabled={saving || confirmingNoStock}
+            title="Confirmar que se chequeó y no hay stock"
+          >
+            {confirmingNoStock ? "..." : noStockConfirmed ? "✓ Sin stock" : "Sin stock"}
+          </button>
+        {/if}
+
         <button
           class="btn btn-primary save-btn"
           on:click={save}
-          disabled={saving}
+          disabled={saving || confirmingNoStock}
         >
-          {saving ? "Guardando..." : "✓ Guardar"}
+          {#if saving}
+            Guardando...
+          {:else if editingLot && mode === 'add'}
+            ✓ Sumar
+          {:else if editingLot}
+            ✓ Actualizar
+          {:else}
+            ✓ Guardar
+          {/if}
         </button>
       </div>
+
     </div>
   </div>
 {/if}
 
 <style>
   .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
     z-index: 200;
-    display: flex;
-    align-items: flex-end; /* sheet desde abajo — más natural en mobile */
-    padding: 0;
+    display: flex; align-items: flex-end;
   }
-
   .modal {
     background: var(--bg-card, #1a1a1a);
     border: 1px solid var(--border-hi, #3a3a3a);
     border-bottom: none;
     border-radius: 16px 16px 0 0;
     width: 100%;
-    max-height: 90dvh;
+    max-height: 92dvh;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     animation: slide-up 0.22s ease-out;
   }
-
   @keyframes slide-up {
-    from {
-      transform: translateY(40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
   }
 
   /* Header */
   .modal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    display: flex; align-items: flex-start; justify-content: space-between;
     padding: 18px 16px 14px;
     border-bottom: 1px solid var(--border, #2a2a2a);
     gap: 12px;
   }
-
-  .modal-title-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .modal-brand {
-    font-family: var(--font-mono, monospace);
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--amber, #f5a623);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .modal-desc {
-    font-family: var(--font-ui, sans-serif);
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-hi, #f0f0f0);
-    line-height: 1.2;
-  }
-
-  .modal-weight {
-    font-family: var(--font-mono, monospace);
-    font-size: 12px;
-    color: var(--text-mid, #a0a0a0);
-  }
-
-  .close-btn {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--bg, #0d0d0d);
-    border: 1px solid var(--border, #2a2a2a);
-    color: var(--text-mid, #a0a0a0);
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .modal-title-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .modal-brand { font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; color: var(--amber, #f5a623); text-transform: uppercase; letter-spacing: 0.06em; }
+  .modal-desc { font-family: var(--font-ui, sans-serif); font-size: 20px; font-weight: 700; color: var(--text-hi, #f0f0f0); line-height: 1.2; }
+  .modal-weight { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-mid, #a0a0a0); }
+  .modal-price { font-family: var(--font-mono, monospace); font-size: 15px; font-weight: 700; color: var(--green, #4ade80); margin-top: 2px; }
+  .close-btn { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--bg, #0d0d0d); border: 1px solid var(--border, #2a2a2a); color: var(--text-mid, #a0a0a0); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
 
   /* Lotes */
-  .lots-section {
-    padding: 12px 16px;
-  }
-
-  .section-label {
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-lo, #555);
-    margin-bottom: 8px;
-  }
-
-  .lots-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
+  .lots-section { padding: 12px 16px; }
+  .section-label { font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo, #555); margin-bottom: 8px; }
+  .lots-list { display: flex; flex-direction: column; gap: 4px; }
   .lot-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    background: var(--bg, #0d0d0d);
-    border-radius: 4px;
-    border: 1px solid var(--border, #2a2a2a);
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; background: var(--bg, #0d0d0d);
+    border-radius: 4px; border: 1px solid var(--border, #2a2a2a);
+    cursor: pointer; text-align: left; width: 100%;
+    -webkit-tap-highlight-color: transparent; transition: border-color 0.15s;
   }
-
-  .lot-number {
-    font-family: var(--font-mono, monospace);
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--amber, #f5a623);
-    flex: 1;
-  }
-
-  .lot-qty {
-    font-family: var(--font-mono, monospace);
-    font-size: 13px;
-    color: var(--green, #4ade80);
-    font-weight: 700;
-  }
-
-  .lot-date {
-    font-family: var(--font-mono, monospace);
-    font-size: 11px;
-    color: var(--text-lo, #555);
-  }
+  .lot-row:hover, .lot-row:active { border-color: var(--amber, #f5a623); }
+  .lot-row.editing { border-color: var(--amber, #f5a623); background: #2a1e00; }
+  .lot-number { font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 700; color: var(--amber, #f5a623); flex: 1; }
+  .lot-qty { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--green, #4ade80); font-weight: 700; }
+  .lot-date { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--text-lo, #555); }
+  .lot-expiry { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--text-lo, #555); }
+  .lot-expiry.expiry-soon { color: var(--red, #f87171); font-weight: 700; }
+  .lot-edit-hint { font-size: 12px; color: var(--text-lo, #444); flex-shrink: 0; }
+  .divider { height: 1px; background: var(--border, #2a2a2a); }
 
   /* Formulario */
-  .modal-body {
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .form-header-row { display: flex; align-items: center; justify-content: space-between; }
+  .new-entry-btn {
+    font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700;
+    padding: 4px 10px; border-radius: 4px;
+    border: 1px solid var(--amber-dim, #b57a1a); background: #2a1e00;
+    color: var(--amber, #f5a623); cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
 
-  .field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+  /* Selector de modo */
+  .mode-selector {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
   }
-
-  .field-label {
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-lo, #555);
-  }
-
-  /* Precio en header */
-  .modal-price {
-    font-family: var(--font-mono, monospace);
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--green, #4ade80);
-    margin-top: 2px;
-  }
-
-  /* Vencimiento en lotes */
-  .lot-expiry {
-    font-family: var(--font-mono, monospace);
-    font-size: 11px;
-    color: var(--text-lo, #555);
-  }
-
-  .lot-expiry.expiry-soon {
-    color: var(--red, #f87171);
-    font-weight: 700;
-  }
-
-  /* Campo de vencimiento */
-  .expiry-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .expiry-input {
-    font-family: var(--font-mono, monospace);
-    font-size: 22px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.12em;
-    width: 100%;
-  }
-
-  .expiry-picker-btn {
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
+  .mode-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 10px 12px; border-radius: 8px;
     border: 1.5px solid var(--border, #2a2a2a);
-    background: var(--bg-card, #1a1a1a);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    cursor: pointer;
-    position: relative;
+    background: var(--bg, #0d0d0d);
+    cursor: pointer; text-align: left;
     -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .mode-btn.active {
+    border-color: var(--amber, #f5a623);
+    background: #2a1e00;
+  }
+  .mode-icon { font-size: 18px; line-height: 1; }
+  .mode-label {
+    font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 700;
+    color: var(--text-hi, #f0f0f0); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .mode-btn.active .mode-label { color: var(--amber, #f5a623); }
+  .mode-desc {
+    font-family: var(--font-ui, sans-serif); font-size: 11px; color: var(--text-lo, #555);
+    line-height: 1.3;
   }
 
-  .expiry-picker-hidden {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
+  /* Stock actual del lote */
+  .current-lot-info {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: var(--bg, #0d0d0d);
+    border-radius: 6px; border: 1px solid var(--border, #2a2a2a);
   }
+  .current-lot-label { font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-lo, #555); }
+  .current-lot-value { font-family: var(--font-mono, monospace); font-size: 15px; font-weight: 700; color: var(--green, #4ade80); }
 
-  .qty-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+  /* Preview */
+  .preview-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; border-radius: 6px;
+    border: 1px solid var(--border, #2a2a2a);
   }
+  .preview-add { border-color: #1c3a28; background: #0d1f14; }
+  .preview-set { border-color: #1a2a3a; background: #0d1420; }
+  .preview-label { font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-lo, #555); }
+  .preview-formula { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-mid, #a0a0a0); }
+  .preview-value { font-family: var(--font-mono, monospace); font-size: 16px; font-weight: 700; color: var(--green, #4ade80); margin-left: auto; }
+  .preview-diff { font-family: var(--font-mono, monospace); font-size: 11px; }
+  .preview-up   { color: var(--green, #4ade80); }
+  .preview-down { color: var(--amber, #f5a623); }
 
-  .qty-input {
-    font-family: var(--font-mono, monospace);
-    font-size: 28px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.05em;
-  }
-
-  /* Ocultar flechas del input number */
-  .qty-input::-webkit-inner-spin-button,
-  .qty-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-  }
-
-  .error-msg {
-    font-size: 14px;
-    color: var(--red, #f87171);
-    padding: 8px 10px;
-    background: var(--red-dim, #7f1d1d);
-    border-radius: 4px;
-  }
+  /* Campos */
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+  .field-label { font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo, #555); }
+  .input-readonly { opacity: 0.6; background: var(--bg, #0d0d0d) !important; }
+  .qty-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .qty-input { font-family: var(--font-mono, monospace); font-size: 28px; font-weight: 700; text-align: center; letter-spacing: 0.05em; }
+  .qty-input::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .expiry-wrap { display: flex; align-items: center; gap: 8px; }
+  .expiry-input { font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 700; text-align: center; letter-spacing: 0.12em; width: 100%; }
+  .expiry-picker-btn { flex-shrink: 0; width: 44px; height: 44px; border-radius: 8px; border: 1.5px solid var(--border, #2a2a2a); background: var(--bg-card, #1a1a1a); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; position: relative; -webkit-tap-highlight-color: transparent; }
+  .expiry-picker-hidden { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .error-msg { font-size: 14px; color: var(--red, #f87171); padding: 8px 10px; background: var(--red-dim, #7f1d1d); border-radius: 4px; }
 
   /* Footer */
   .modal-footer {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 8px;
+    display: flex; gap: 8px;
     padding: 12px 16px 20px;
     border-top: 1px solid var(--border, #2a2a2a);
   }
+  .modal-footer .btn-ghost  { flex-shrink: 0; }
+  .modal-footer .btn-primary { flex: 1; font-size: 16px; }
 
-  .save-btn {
-    font-size: 18px;
+  .btn-no-stock {
+    flex-shrink: 0; height: 48px; padding: 0 14px; border-radius: 8px;
+    border: 1.5px solid var(--border-hi, #3a3a3a); background: var(--bg, #0d0d0d);
+    color: var(--text-mid, #a0a0a0); font-family: var(--font-mono, monospace);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, color 0.15s;
   }
+  .btn-no-stock.confirmed { border-color: var(--red, #f87171); color: var(--red, #f87171); background: #2a0a0a; }
+  .btn-no-stock:not(.confirmed):hover, .btn-no-stock:not(.confirmed):active { border-color: var(--red, #f87171); color: var(--red, #f87171); }
 </style>

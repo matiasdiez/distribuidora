@@ -4,7 +4,7 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 5; // v5: fuerza re-sync para obtener catálogo completo (paginación)
+const DB_VERSION = 6; // v6: stock_history + confirmNoStock + SET mode
 
 export type PendingSync =
   | {
@@ -26,124 +26,89 @@ export type PendingSync =
       created_at: string;
     };
 
+export type MoveType = 'recepcion' | 'inventario';
+
+export interface StockHistoryEntry {
+  id?: number;
+  product_id: number;
+  depot_id: number;
+  lot_number: string;
+  old_quantity: number;
+  old_boxes: number;
+  new_quantity: number;
+  new_boxes: number;
+  move_type: MoveType;   // 'recepcion' = suma delta | 'inventario' = reemplaza con conteo
+  changed_at: string;
+}
+
 interface DepostioDB {
   products: {
     key: number;
     value: Product;
-    indexes: {
-      by_brand: string;
-      by_category: string;
-      by_code: string;
-    };
+    indexes: { by_brand: string; by_category: string; by_code: string };
   };
   stock_entries: {
     key: number;
     value: StockEntry & { local_id?: number };
-    indexes: {
-      by_product: number;
-      by_depot: number;
-    };
+    indexes: { by_product: number; by_depot: number };
   };
-  depots: {
+  stock_history: {
     key: number;
-    value: Depot;
+    value: StockHistoryEntry;
+    indexes: { by_product: number };
   };
-  pending_sync: {
-    key: number;
-    value: PendingSync;
-  };
-  meta: {
-    key: string;
-    value: { key: string; value: string };
-  };
+  depots: { key: number; value: Depot };
+  pending_sync: { key: number; value: PendingSync };
+  meta: { key: string; value: { key: string; value: string } };
 }
-
-// ── Apertura y migración ──────────────────────────────────────
 
 let _db: IDBPDatabase<DepostioDB> | null = null;
 
 export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
   if (_db) return _db;
-
   _db = await openDB<DepostioDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
-        // Productos
-        const productStore = db.createObjectStore("products", {
-          keyPath: "id",
-        });
+        const productStore = db.createObjectStore("products", { keyPath: "id" });
         productStore.createIndex("by_brand", "brand");
         productStore.createIndex("by_category", "category");
         productStore.createIndex("by_code", "code", { unique: true });
-
-        // Stock
-        const stockStore = db.createObjectStore("stock_entries", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
+        const stockStore = db.createObjectStore("stock_entries", { keyPath: "id", autoIncrement: true });
         stockStore.createIndex("by_product", "product_id");
         stockStore.createIndex("by_depot", "depot_id");
-
-        // Depósitos
         db.createObjectStore("depots", { keyPath: "id" });
-
-        // Cola de sync pendiente
-        db.createObjectStore("pending_sync", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-
-        // Metadatos (ej: fecha última sync)
+        db.createObjectStore("pending_sync", { keyPath: "id", autoIncrement: true });
         db.createObjectStore("meta", { keyPath: "key" });
       }
-
       if (oldVersion < 2) {
-        // Migración v2: índice por depot_id en productos
-        const productStore = transaction.objectStore("products");
-        if (!productStore.indexNames.contains("by_depot")) {
-          productStore.createIndex("by_depot", "depot_id");
-        }
+        const ps = transaction.objectStore("products");
+        if (!ps.indexNames.contains("by_depot")) ps.createIndex("by_depot", "depot_id");
       }
-
-      if (oldVersion < 3) {
-        // Migración v3: columna boxes en stock_entries.
-        // Forzar re-fetch limpiando last_sync.
-        try {
-          transaction.objectStore("meta").delete("last_sync");
-        } catch {}
-      }
-
-      if (oldVersion < 4) {
-        // Migración v4: columna expiry_date. Forzar re-fetch.
-        try {
-          transaction.objectStore("meta").delete("last_sync");
-        } catch {}
-      }
-
+      if (oldVersion < 3) { try { transaction.objectStore("meta").delete("last_sync"); } catch {} }
+      if (oldVersion < 4) { try { transaction.objectStore("meta").delete("last_sync"); } catch {} }
       if (oldVersion < 5) {
-        // Migración v5: forzar re-sync completo para obtener el catálogo
-        // entero con la nueva función paginada (antes se cortaba en 1000).
-        try {
-          transaction.objectStore("meta").delete("last_sync");
-          transaction.objectStore("meta").delete("initialized");
-        } catch {}
+        try { transaction.objectStore("meta").delete("last_sync"); transaction.objectStore("meta").delete("initialized"); } catch {}
+      }
+      if (oldVersion < 6) {
+        // v6: historial de cambios de stock
+        if (!db.objectStoreNames.contains("stock_history")) {
+          const hs = db.createObjectStore("stock_history", { keyPath: "id", autoIncrement: true });
+          hs.createIndex("by_product", "product_id");
+        }
       }
     },
   });
-
   return _db;
 }
 
 // ── Productos ─────────────────────────────────────────────────
 
-/** Guarda lista completa de productos (sync inicial) */
 export async function saveProducts(products: Product[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("products", "readwrite");
   await Promise.all([...products.map((p) => tx.store.put(p)), tx.done]);
 }
 
-/** Búsqueda local de productos por texto libre */
 export async function searchProducts(
   query: string,
   category?: string,
@@ -153,7 +118,6 @@ export async function searchProducts(
   const lowerQ = query.toLowerCase().trim();
   let products: Product[];
 
-  // Filtrar por depósito si se indica
   if (depotId === "unassigned") {
     const all = await db.getAll("products");
     products = all.filter((p) => p.depot_id == null);
@@ -165,7 +129,6 @@ export async function searchProducts(
     products = await db.getAll("products");
   }
 
-  // Filtro de categoría secundario cuando se filtra por depósito
   if (typeof depotId !== "undefined" && category && category !== "Todos") {
     products = products.filter((p) => p.category === category);
   }
@@ -181,7 +144,6 @@ export async function searchProducts(
   );
 }
 
-/** Asigna un depósito a productos localmente y encola para sync */
 export async function assignProductsToDepotLocal(
   productIds: number[],
   depotId: number | null,
@@ -189,35 +151,26 @@ export async function assignProductsToDepotLocal(
   const db = await getDB();
   const now = new Date().toISOString();
   const tx = db.transaction(["products", "pending_sync"], "readwrite");
-
   await Promise.all(
     productIds.map(async (id) => {
       const product = await tx.objectStore("products").get(id);
-      if (product) {
-        tx.objectStore("products").put({ ...product, depot_id: depotId });
-      }
+      if (product) tx.objectStore("products").put({ ...product, depot_id: depotId });
     }),
   );
-
-  // Encolar sync
   tx.objectStore("pending_sync").add({
     type: "depot_assignment",
     payload: { product_ids: productIds, depot_id: depotId },
     created_at: now,
   });
-
   await tx.done;
 }
 
-/** Trae todas las categorías únicas */
 export async function getCategories(): Promise<string[]> {
   const db = await getDB();
   const products = await db.getAll("products");
-  const cats = [...new Set(products.map((p) => p.category))].sort();
-  return cats;
+  return [...new Set(products.map((p) => p.category))].sort();
 }
 
-/** Cuenta total de productos guardados */
 export async function countProducts(): Promise<number> {
   const db = await getDB();
   return db.count("products");
@@ -225,76 +178,106 @@ export async function countProducts(): Promise<number> {
 
 // ── Stock ─────────────────────────────────────────────────────
 
-/** Guarda entradas de stock remotas (sync inicial) */
 export async function saveStockEntries(entries: StockEntry[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("stock_entries", "readwrite");
   await Promise.all([...entries.map((e) => tx.store.put(e)), tx.done]);
 }
 
-/** Trae todo el stock de un producto */
-export async function getStockByProduct(
-  productId: number,
-): Promise<StockEntry[]> {
+export async function getStockByProduct(productId: number): Promise<StockEntry[]> {
   const db = await getDB();
   return db.getAllFromIndex("stock_entries", "by_product", productId);
 }
 
-/** Stock total de un producto en un depósito */
-export async function getTotalStock(
-  productId: number,
-  depotId: number,
-): Promise<number> {
+export async function getTotalStock(productId: number, depotId: number): Promise<number> {
   const entries = await getStockByProduct(productId);
   return entries
-    .filter((e) => e.depot_id === depotId)
+    .filter((e) => e.depot_id === depotId && e.lot_number !== "CONTROL")
     .reduce((sum, e) => sum + e.quantity, 0);
 }
 
-/** Agrega o actualiza un lote localmente y encola para sync */
+/**
+ * Agrega o actualiza un lote según el modo indicado.
+ *
+ * mode = 'add'  → RECEPCIÓN: suma el delta al stock existente.
+ *                 El operario ingresa cuánto llegó ("recibí 5 cajas").
+ *                 El payload enviado a Supabase siempre es el TOTAL resultante.
+ *
+ * mode = 'set'  → INVENTARIO: reemplaza con el conteo real.
+ *                 El operario ingresa lo que ve en el estante ("hay 12 unidades").
+ *                 Supabase queda con ese valor absoluto.
+ *
+ * Para lotes nuevos ambos modos son equivalentes (no hay valor previo).
+ * El payload de sync siempre lleva el total final, nunca el delta,
+ * para que Supabase quede consistente con IndexedDB.
+ */
 export async function addStockEntry(
   entry: Omit<StockEntry, "id" | "created_at">,
   depotId: number,
+  mode: 'add' | 'set' = 'set',
 ): Promise<void> {
   const db = await getDB();
-  const all = await db.getAllFromIndex(
-    "stock_entries",
-    "by_product",
-    entry.product_id,
-  );
+  const all = await db.getAllFromIndex("stock_entries", "by_product", entry.product_id);
   const existing = all.find(
     (e) => e.depot_id === depotId && e.lot_number === entry.lot_number,
   );
 
   const now = new Date().toISOString();
-  const tx = db.transaction(["stock_entries", "pending_sync"], "readwrite");
+
+  // Calcular valores finales según modo
+  const finalQty  = (mode === 'add' && existing)
+    ? (existing.quantity      + entry.quantity)
+    : entry.quantity;
+  const finalBoxes = (mode === 'add' && existing)
+    ? ((existing.boxes ?? 0)  + (entry.boxes ?? 0))
+    : (entry.boxes ?? 0);
+
+  const tx = db.transaction(["stock_entries", "stock_history", "pending_sync"], "readwrite");
 
   if (existing) {
-    // Suma al lote existente; expiry_date se actualiza si se provee una nueva
-    const updated = {
+    // Guardar historial con tipo de movimiento
+    tx.objectStore("stock_history").add({
+      product_id: existing.product_id,
+      depot_id:   existing.depot_id,
+      lot_number: existing.lot_number,
+      old_quantity: existing.quantity,
+      old_boxes:    existing.boxes ?? 0,
+      new_quantity: finalQty,
+      new_boxes:    finalBoxes,
+      move_type:    mode === 'add' ? 'recepcion' : 'inventario',
+      changed_at:   now,
+    } as StockHistoryEntry);
+
+    tx.objectStore("stock_entries").put({
       ...existing,
-      quantity: existing.quantity + entry.quantity,
-      boxes: (existing.boxes ?? 0) + (entry.boxes ?? 0),
-      expiry_date: entry.expiry_date ?? existing.expiry_date,
-    };
-    tx.objectStore("stock_entries").put(updated);
+      quantity:    finalQty,
+      boxes:       finalBoxes,
+      expiry_date: entry.expiry_date !== undefined ? entry.expiry_date : existing.expiry_date,
+      notes:       entry.notes       !== undefined ? entry.notes       : existing.notes,
+      created_at:  now,
+    });
   } else {
+    // Lote nuevo: 'add' y 'set' son equivalentes
     tx.objectStore("stock_entries").add({
       ...entry,
-      boxes: entry.boxes ?? 0,
+      quantity:    finalQty,
+      boxes:       finalBoxes,
       expiry_date: entry.expiry_date ?? null,
-      depot_id: depotId,
-      created_at: now,
+      depot_id:    depotId,
+      created_at:  now,
     });
   }
 
+  // Payload de sync siempre lleva el total final (no el delta)
+  // para que el upsert en Supabase quede con el valor correcto
   tx.objectStore("pending_sync").add({
     type: "stock_upsert",
     payload: {
       ...entry,
-      boxes: entry.boxes ?? 0,
+      quantity:    finalQty,
+      boxes:       finalBoxes,
       expiry_date: entry.expiry_date ?? null,
-      depot_id: depotId,
+      depot_id:    depotId,
     },
     created_at: now,
   });
@@ -302,7 +285,58 @@ export async function addStockEntry(
   await tx.done;
 }
 
-/** Trae los lotes que vencen dentro de los próximos `days` días */
+/**
+ * Confirma "sin stock" para un producto en un depósito.
+ * Crea/actualiza una entrada especial lot_number="CONTROL" con quantity=0.
+ * La fecha de esta entrada aparece como "Última actualización" en el CSV,
+ * indicando que el producto fue chequeado aunque esté en cero.
+ */
+export async function confirmNoStock(productId: number, depotId: number): Promise<void> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex("stock_entries", "by_product", productId);
+  const controlLot = all.find((e) => e.depot_id === depotId && e.lot_number === "CONTROL");
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(["stock_entries", "pending_sync"], "readwrite");
+
+  if (controlLot) {
+    tx.objectStore("stock_entries").put({ ...controlLot, created_at: now });
+  } else {
+    tx.objectStore("stock_entries").add({
+      product_id: productId,
+      depot_id: depotId,
+      lot_number: "CONTROL",
+      quantity: 0,
+      boxes: 0,
+      expiry_date: null,
+      notes: "Sin stock confirmado",
+      created_at: now,
+    });
+  }
+
+  tx.objectStore("pending_sync").add({
+    type: "stock_upsert",
+    payload: {
+      product_id: productId,
+      depot_id: depotId,
+      lot_number: "CONTROL",
+      quantity: 0,
+      boxes: 0,
+      expiry_date: null,
+      notes: "Sin stock confirmado",
+    },
+    created_at: now,
+  });
+
+  await tx.done;
+}
+
+/** Historial de cambios de un producto */
+export async function getStockHistory(productId: number): Promise<StockHistoryEntry[]> {
+  const db = await getDB();
+  return db.getAllFromIndex("stock_history", "by_product", productId);
+}
+
 export async function getExpiringLots(
   days: number = 30,
 ): Promise<(StockEntry & { local_id?: number })[]> {
@@ -314,11 +348,9 @@ export async function getExpiringLots(
   today.setHours(0, 0, 0, 0);
 
   return all.filter((e) => {
-    if (!e.expiry_date) return false;
+    if (!e.expiry_date || e.lot_number === "CONTROL") return false;
     const exp = new Date(e.expiry_date);
-    return (
-      exp >= today && exp <= limit && (e.quantity > 0 || (e.boxes ?? 0) > 0)
-    );
+    return exp >= today && exp <= limit && (e.quantity > 0 || (e.boxes ?? 0) > 0);
   });
 }
 
@@ -361,7 +393,6 @@ export async function getMeta(key: string): Promise<string | null> {
   return row?.value ?? null;
 }
 
-/** Verifica si ya se hizo la sync inicial */
 export async function isInitialized(): Promise<boolean> {
   const val = await getMeta("initialized");
   return val === "true";

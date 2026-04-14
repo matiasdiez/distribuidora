@@ -2,7 +2,7 @@
   import { getStockByProduct } from '../lib/idb';
   import type { Product } from '../lib/supabase';
 
-  export let products: Product[] = [];   // los productos que están visibles ahora
+  export let products: Product[] = [];
   export let depotId: number = 1;
   export let categoryLabel: string = 'Todos';
 
@@ -13,28 +13,33 @@
     exporting = true;
 
     try {
-      // Construir filas con stock y fecha de última actualización
       const rows: string[][] = [];
 
-      // Encabezado
+      // Encabezado — "Cajas" y "Unidades" separados
       rows.push([
         'Código',
         'Marca',
         'Descripción',
         'Peso / Cant.',
         'Categoría',
-        'Stock total',
+        'Cajas',
+        'Unidades',
         'Última actualización',
       ]);
 
       for (const p of products) {
         const entries = await getStockByProduct(p.id);
-        const depotEntries = entries.filter(e => e.depot_id === depotId);
-        const totalStock = depotEntries.reduce((s, e) => s + e.quantity, 0);
+        const allDepotEntries = entries.filter(e => e.depot_id === depotId);
 
-        // Última actualización: el created_at más reciente de los lotes
-        const lastUpdate = depotEntries.length > 0
-          ? depotEntries
+        // Excluir la entrada CONTROL del cálculo de stock
+        const realEntries = allDepotEntries.filter(e => e.lot_number !== 'CONTROL');
+        const totalUnits = realEntries.reduce((s, e) => s + e.quantity, 0);
+        const totalBoxes = realEntries.reduce((s, e) => s + (e.boxes ?? 0), 0);
+
+        // "Última actualización": max created_at de TODOS los lotes, incluido CONTROL.
+        // Así, confirmar "sin stock" también registra la fecha de chequeo.
+        const lastUpdate = allDepotEntries.length > 0
+          ? allDepotEntries
               .map(e => new Date(e.created_at))
               .sort((a, b) => b.getTime() - a.getTime())[0]
               .toLocaleDateString('es-AR', {
@@ -49,38 +54,30 @@
           p.description,
           p.weight_qty ?? '',
           p.category,
-          String(totalStock),
+          String(totalBoxes),
+          String(totalUnits),
           lastUpdate,
         ]);
       }
 
-      // Serializar a CSV
       const csv = rows
-        .map(row =>
-          row
-            .map(cell => `"${String(cell).replace(/"/g, '""')}"`)
-            .join(',')
-        )
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\r\n');
 
-      // BOM para que Excel lo abra bien con tildes
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const url  = URL.createObjectURL(blob);
 
-      // Nombre del archivo con fecha y categoría activa
       const date = new Date().toLocaleDateString('es-AR', {
         day: '2-digit', month: '2-digit', year: '2-digit',
       }).replace(/\//g, '-');
       const catSlug = categoryLabel.replace(/\s+/g, '_').toLowerCase();
       const filename = `stock_${catSlug}_${date}.csv`;
 
-      // Disparar descarga
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-
     } finally {
       exporting = false;
     }
@@ -125,35 +122,14 @@
     -webkit-tap-highlight-color: transparent;
     white-space: nowrap;
   }
-
   .export-btn:not(.disabled):hover,
   .export-btn:not(.disabled):active {
     border-color: var(--green, #4ade80);
     color: var(--green, #4ade80);
   }
-
-  .export-btn.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .btn-icon {
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .count {
-    color: var(--text-lo, #555);
-    font-size: 10px;
-  }
-
-  .spin {
-    display: inline-block;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-  }
+  .export-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-icon { font-size: 14px; line-height: 1; }
+  .count { color: var(--text-lo, #555); font-size: 10px; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

@@ -5,27 +5,20 @@
  *  1. Sync inicial: descarga productos + stock de Supabase → IndexedDB
  *  2. Sync de cambios: sube pending_sync a Supabase cuando hay conexión
  *  3. Detecta cambios de conectividad y reintenta automáticamente
+ *  4. Sync programado a las 7:30 AM hora Buenos Aires (UTC-3, sin DST)
  */
 
 import {
-  saveProducts,
-  saveStockEntries,
-  saveDepots,
-  setMeta,
-  getMeta,
-  isInitialized,
-  getPendingSync,
-  clearPendingSync,
+  saveProducts, saveStockEntries, saveDepots,
+  setMeta, getMeta, isInitialized,
+  getPendingSync, clearPendingSync,
 } from './idb';
 
 import {
-  fetchAllProducts,
-  fetchStockByDepot,
-  fetchDepots,
+  fetchAllProducts, fetchStockByDepot, fetchDepots,
   upsertStockEntry,
 } from './supabase';
 
-// Evento custom que los componentes Svelte pueden escuchar
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';
 
 type SyncListener = (status: SyncStatus, message?: string) => void;
@@ -33,7 +26,7 @@ const listeners: Set<SyncListener> = new Set();
 
 export function onSyncStatus(fn: SyncListener): () => void {
   listeners.add(fn);
-  return () => listeners.delete(fn);  // devuelve unsubscribe
+  return () => listeners.delete(fn);
 }
 
 function emit(status: SyncStatus, message?: string) {
@@ -43,23 +36,17 @@ function emit(status: SyncStatus, message?: string) {
 
 // ── Sync inicial ──────────────────────────────────────────────
 
-/**
- * Descarga todos los datos de Supabase y los guarda en IndexedDB.
- * Solo se llama una vez (o al forzar refresh).
- */
-export async function initialSync(depotId: number = 1): Promise<void> {
+export async function initialSync(depotId: number = 1, force = false): Promise<void> {
   if (!navigator.onLine) {
     emit('offline', 'Sin conexión para sync inicial');
     return;
   }
 
-  // Verificar si ya está inicializado y si los datos son recientes
-  if (await isInitialized()) {
+  if (!force && await isInitialized()) {
     const lastSync = await getMeta('last_sync');
     if (lastSync) {
       const hoursSince = (Date.now() - new Date(lastSync).getTime()) / 36e5;
       if (hoursSince < 24) {
-        // Datos frescos, no es necesario re-sync
         emit('idle');
         return;
       }
@@ -69,21 +56,18 @@ export async function initialSync(depotId: number = 1): Promise<void> {
   emit('syncing', 'Descargando productos...');
 
   try {
-    const [products, depots] = await Promise.all([
-      fetchAllProducts(),
-      fetchDepots(),
-    ]);
-
+    const [products, depots] = await Promise.all([fetchAllProducts(), fetchDepots()]);
     await saveDepots(depots);
     await saveProducts(products);
 
     emit('syncing', 'Descargando stock...');
-
     const stock = await fetchStockByDepot(depotId);
     await saveStockEntries(stock);
 
     await setMeta('initialized', 'true');
     await setMeta('last_sync', new Date().toISOString());
+    // Registrar la fecha (Buenos Aires) de la última sync diaria
+    await setMeta('last_daily_sync_date', getBADateString());
 
     emit('success', `${products.length} productos sincronizados`);
   } catch (err) {
@@ -95,10 +79,6 @@ export async function initialSync(depotId: number = 1): Promise<void> {
 
 // ── Sync de cambios pendientes ────────────────────────────────
 
-/**
- * Sube los cambios locales pendientes a Supabase.
- * Se llama automáticamente al detectar conexión.
- */
 export async function syncPending(): Promise<void> {
   if (!navigator.onLine) return;
 
@@ -106,7 +86,6 @@ export async function syncPending(): Promise<void> {
   if (pending.length === 0) return;
 
   emit('syncing', `Sincronizando ${pending.length} cambio(s)...`);
-
   const synced: number[] = [];
 
   for (const item of pending) {
@@ -121,13 +100,9 @@ export async function syncPending(): Promise<void> {
       } else if (item.type === 'depot_create') {
         const { createDepot } = await import('./supabase');
         const { saveDepots, getDepots } = await import('./idb');
-        // Crear el depósito en Supabase con el nombre guardado
         const newDepot = await createDepot(item.payload.name);
-        // Reemplazar el depósito temporal (id negativo) con el ID real
         const depots = await getDepots();
-        const updated = depots.map(d =>
-          d.id === item.payload.temp_id ? { ...d, id: newDepot.id } : d
-        );
+        const updated = depots.map(d => d.id === item.payload.temp_id ? { ...d, id: newDepot.id } : d);
         await saveDepots(updated);
         if (item.id) synced.push(item.id);
       }
@@ -136,9 +111,7 @@ export async function syncPending(): Promise<void> {
     }
   }
 
-  if (synced.length > 0) {
-    await clearPendingSync(synced);
-  }
+  if (synced.length > 0) await clearPendingSync(synced);
 
   const remaining = pending.length - synced.length;
   if (remaining === 0) {
@@ -151,33 +124,98 @@ export async function syncPending(): Promise<void> {
 
 // ── Listeners de conectividad ─────────────────────────────────
 
-/**
- * Registra listeners de online/offline en el navegador.
- * Llamar una sola vez al montar la app.
- */
 export function initConnectivityListeners(depotId: number = 1): () => void {
   const handleOnline = async () => {
     console.log('[sync] conexión restaurada');
     await syncPending();
   };
-
   const handleOffline = () => {
     emit('offline', 'Sin conexión — modo local activo');
   };
 
-  window.addEventListener('online',  handleOnline);
+  window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
 
-  // Retorna función para limpiar listeners (útil en onDestroy de Svelte)
+  // Al iniciar, si ya hay conexión, subir cambios pendientes inmediatamente
+  if (navigator.onLine) {
+    syncPending().catch(console.error);
+  }
+
   return () => {
-    window.removeEventListener('online',  handleOnline);
+    window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
   };
 }
 
-
-// ── Utilidad: estado de conexión ──────────────────────────────
-
 export function isOnline(): boolean {
   return typeof navigator !== 'undefined' ? navigator.onLine : false;
+}
+
+
+// ── Sync programado a las 7:30 AM hora Buenos Aires ──────────
+// Argentina es UTC-3 todo el año (no tiene horario de verano desde 2008)
+
+const SYNC_HOUR_UTC = 10;   // 7:30 AM ART = 10:30 UTC
+const SYNC_MINUTE_UTC = 30;
+
+function msUntilNext7_30BA(): number {
+  const now = new Date();
+  const todaySync = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+    SYNC_HOUR_UTC, SYNC_MINUTE_UTC, 0, 0,
+  ));
+  if (now >= todaySync) {
+    todaySync.setUTCDate(todaySync.getUTCDate() + 1);
+  }
+  return todaySync.getTime() - now.getTime();
+}
+
+/** Fecha actual en Buenos Aires, formato "YYYY-MM-DD" */
+function getBADateString(): string {
+  return new Date(Date.now() - 3 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+let _dailySyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Programa la sync diaria a las 7:30 AM Buenos Aires.
+ * Llama a syncPending() primero (sube cambios), luego initialSync(force=true).
+ * Retorna función para cancelar el timer.
+ */
+export function scheduleDailySync(depotId: number = 1): () => void {
+  function schedule() {
+    const ms = msUntilNext7_30BA();
+    console.log(`[sync] próxima sync diaria en ${Math.round(ms / 60000)} min`);
+    _dailySyncTimer = setTimeout(async () => {
+      console.log('[sync] ejecutando sync diaria 7:30 AM BA');
+      if (navigator.onLine) {
+        await syncPending();
+        await initialSync(depotId, true);
+      }
+      schedule(); // reprogramar para el día siguiente
+    }, ms);
+  }
+  schedule();
+  return () => { if (_dailySyncTimer) clearTimeout(_dailySyncTimer); };
+}
+
+/**
+ * Verifica si la sync matutina de HOY ya se hizo.
+ * Retorna true si ya fue sincronizado esta mañana (después de las 7:30 BA).
+ * Se usa para mostrar el banner de aviso en la app.
+ */
+export async function isMorningSyncDone(): Promise<boolean> {
+  const lastDate = await getMeta('last_daily_sync_date');
+  if (!lastDate) return false;
+  const todayBA = getBADateString();
+  if (lastDate !== todayBA) return false;
+  // Verificar que ya pasaron las 7:30 BA
+  const nowUTC = new Date();
+  const syncTimeUTC = new Date(Date.UTC(
+    nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate(),
+    SYNC_HOUR_UTC, SYNC_MINUTE_UTC,
+  ));
+  return nowUTC >= syncTimeUTC;
 }
