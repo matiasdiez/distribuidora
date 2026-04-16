@@ -18,7 +18,35 @@
     close:         void;
     depotSelected: Depot;
     depotsUpdated: Depot[];
+    forceSync:     void;
   }>();
+
+  // ── Sync forzado ─────────────────────────────────────────────
+  let syncing     = false;
+  let syncResult: 'idle' | 'ok' | 'error' = 'idle';
+  let syncMessage = '';
+
+  async function handleForceSync() {
+    syncing     = true;
+    syncResult  = 'idle';
+    syncMessage = 'Subiendo cambios locales...';
+    try {
+      const { syncPending, initialSync } = await import('../lib/sync');
+      await syncPending();
+      syncMessage = 'Descargando base de datos...';
+      await initialSync(1, true);
+      syncResult  = 'ok';
+      syncMessage = 'Base de datos actualizada ✓';
+      dispatch('forceSync');
+      setTimeout(() => { syncResult = 'idle'; syncMessage = ''; }, 3000);
+    } catch (e) {
+      syncResult  = 'error';
+      syncMessage = 'Error al sincronizar. Verificá la conexión.';
+      console.error('[forceSync]', e);
+    } finally {
+      syncing = false;
+    }
+  }
 
   // ── Preferencia auto-enter ───────────────────────────────────
   let autoEnter = getAutoEnter();
@@ -206,6 +234,37 @@
           </span>
           <span class="action-badge">{$theme === 'dark' ? 'Dark' : 'Light'}</span>
         </button>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Sección: Sincronización -->
+      <section class="section">
+        <p class="section-label">Sincronización</p>
+        <button
+          class="action-row sync-row"
+          class:sync-ok={syncResult === 'ok'}
+          class:sync-error={syncResult === 'error'}
+          on:click={handleForceSync}
+          disabled={syncing}
+        >
+          <span class="action-icon" class:spin={syncing}>⟳</span>
+          <span class="action-label">
+            {#if syncing}
+              {syncMessage}
+            {:else if syncResult === 'ok'}
+              {syncMessage}
+            {:else if syncResult === 'error'}
+              {syncMessage}
+            {:else}
+              Forzar actualización
+            {/if}
+          </span>
+          {#if !syncing && syncResult === 'idle'}
+            <span class="action-badge">↓ DB</span>
+          {/if}
+        </button>
+        <p class="sync-hint">Sube cambios locales y descarga la base de datos completa.</p>
       </section>
 
       <div class="divider"></div>
@@ -574,5 +633,29 @@
     font-size: 10px;
     color: var(--text-lo);
     letter-spacing: 0.03em;
+  }
+
+  .sync-row          { transition: border-color 0.15s, color 0.15s; }
+  .sync-row.sync-ok  { border-color: var(--green, #4ade80); color: var(--green, #4ade80); }
+  .sync-row.sync-error { border-color: var(--red, #f87171); color: var(--red, #f87171); }
+  .sync-row:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  .sync-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    letter-spacing: 0.03em;
+    margin-top: 4px;
+    padding: 0 2px;
+  }
+
+  .spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
   }
 </style>

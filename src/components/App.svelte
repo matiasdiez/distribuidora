@@ -308,6 +308,7 @@
     on:close={() => (showSettings = false)}
     on:depotSelected={(e) => handleDepotSelected(e.detail)}
     on:depotsUpdated={(e) => handleDepotsUpdated(e.detail)}
+    on:forceSync={() => { showSyncWarning = false; stockVersion++; }}
   />
 {/if}
 
