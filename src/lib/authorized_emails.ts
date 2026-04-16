@@ -10,6 +10,7 @@ const AUTHORIZED_EMAILS: string[] = [
   // Agregar emails autorizados, por ejemplo:
   // 'gerente@miempresa.com',
   // 'empleado@gmail.com',
+  "matiasdiez@gmail.com",
 ];
 
 export default AUTHORIZED_EMAILS;
