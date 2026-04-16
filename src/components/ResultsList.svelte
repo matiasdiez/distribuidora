@@ -1,12 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
-  import { Loader2, PackageSearch, SearchX, Package } from 'lucide-svelte';
+  import { Loader2, PackageSearch, SearchX, Package } from "lucide-svelte";
   import { getStockByProduct } from "../lib/idb";
   import {
-    loadThresholds, calcFreshness, type FreshnessThresholds,
+    loadThresholds,
+    calcFreshness,
+    type FreshnessThresholds,
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
-  import { Loader2, PackageSearch, Package } from 'lucide-svelte';
   import type { Product } from "../lib/supabase";
 
   export let products: Product[] = [];
@@ -27,7 +28,9 @@
   }
 
   // Resetear paginación al cambiar la lista de productos
-  $: if (products) { visibleCount = PAGE_SIZE; }
+  $: if (products) {
+    visibleCount = PAGE_SIZE;
+  }
 
   // ── Cache de stock y frescura ────────────────────────────────
   type StockInfo = {
@@ -63,18 +66,22 @@
       const entries = await Promise.all(
         chunk.map(async (p) => {
           const lots = await getStockByProduct(p.id);
-          const depot = dId !== undefined ? lots.filter(l => l.depot_id === dId) : lots;
+          const depot =
+            dId !== undefined ? lots.filter((l) => l.depot_id === dId) : lots;
 
-          const realLots = depot.filter(l => l.lot_number !== "CONTROL");
-          const controlLot = depot.find(l => l.lot_number === "CONTROL");
+          const realLots = depot.filter((l) => l.lot_number !== "CONTROL");
+          const controlLot = depot.find((l) => l.lot_number === "CONTROL");
 
           const units = realLots.reduce((s, l) => s + l.quantity, 0);
           const boxes = realLots.reduce((s, l) => s + (l.boxes ?? 0), 0);
-          const noStockConfirmed = !!(controlLot);
+          const noStockConfirmed = !!controlLot;
 
-          const latest = depot.length > 0
-            ? depot.map(l => new Date(l.created_at)).sort((a, b) => b.getTime() - a.getTime())[0]
-            : null;
+          const latest =
+            depot.length > 0
+              ? depot
+                  .map((l) => new Date(l.created_at))
+                  .sort((a, b) => b.getTime() - a.getTime())[0]
+              : null;
           const fresh = calcFreshness(latest, t);
 
           return [p.id, { units, boxes, noStockConfirmed, fresh }] as const;
@@ -93,7 +100,7 @@
 
       // Ceder al event loop entre chunks (permite que el input responda)
       if (i + CHUNK < list.length) {
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
       }
     }
   }
@@ -119,7 +126,9 @@
 <div class="results">
   {#if isLoading}
     <div class="empty-state">
-      <span class="empty-icon"><Loader2 size={28} strokeWidth={1.5} class="spin-icon" /></span>
+      <span class="empty-icon"
+        ><Loader2 size={28} strokeWidth={1.5} class="spin-icon" /></span
+      >
       <span>Buscando...</span>
     </div>
   {:else if products.length === 0 && query.length > 0}
@@ -129,7 +138,9 @@
     </div>
   {:else if products.length === 0}
     <div class="empty-state">
-      <span class="empty-icon"><PackageSearch size={28} strokeWidth={1.5} /></span>
+      <span class="empty-icon"
+        ><PackageSearch size={28} strokeWidth={1.5} /></span
+      >
       <span>Escribí para buscar productos</span>
     </div>
   {:else}
@@ -144,18 +155,31 @@
 
     <div class="product-list">
       {#each visibleProducts as product (product.id)}
-        {@const stockEntry = stockCache[product.id] ?? { units: 0, boxes: 0, noStockConfirmed: false }}
-        {@const hasStock = depotId !== "unassigned" && depotId !== undefined && (stockEntry.units > 0 || stockEntry.boxes > 0)}
+        {@const stockEntry = stockCache[product.id] ?? {
+          units: 0,
+          boxes: 0,
+          noStockConfirmed: false,
+        }}
+        {@const hasStock =
+          depotId !== "unassigned" &&
+          depotId !== undefined &&
+          (stockEntry.units > 0 || stockEntry.boxes > 0)}
         {@const fresh = freshnessCache[product.id]}
 
         <div class="product-card" class:has-stock={hasStock}>
           <!-- Barra lateral -->
-          <div class="status-bar" class:stock-ok={hasStock} class:stock-no={!hasStock}></div>
+          <div
+            class="status-bar"
+            class:stock-ok={hasStock}
+            class:stock-no={!hasStock}
+          ></div>
 
           <div class="product-body">
             <div class="product-top">
               <div class="product-meta">
-                <span class="product-brand">{@html highlight(product.brand, query)}</span>
+                <span class="product-brand"
+                  >{@html highlight(product.brand, query)}</span
+                >
                 <span class="product-code">{product.code}</span>
               </div>
 
@@ -166,22 +190,31 @@
                 {:else if depotId === "unassigned"}
                   <span class="badge badge-gray">Sin asignar</span>
                 {:else if hasStock}
-                  <span class="badge badge-green">{formatStock(stockEntry.units, stockEntry.boxes)}</span>
+                  <span class="badge badge-green"
+                    >{formatStock(stockEntry.units, stockEntry.boxes)}</span
+                  >
                 {:else if stockEntry.noStockConfirmed}
                   <!-- Confirmado sin stock → rojo -->
                   <span class="badge badge-red">Sin stock</span>
                 {:else}
                   <!-- Sin stock y sin chequeo confirmado → gris -->
-                  <span class="badge badge-gray badge-unchecked">Sin stock</span>
+                  <span class="badge badge-gray badge-unchecked">Sin stock</span
+                  >
                 {/if}
                 {#if fresh && depotId !== "unassigned" && depotId !== undefined}
-                  <FreshnessDot status={fresh.status} label={fresh.label} size="sm" />
+                  <FreshnessDot
+                    status={fresh.status}
+                    label={fresh.label}
+                    size="sm"
+                  />
                 {/if}
               </div>
             </div>
 
             <div class="product-desc">
-              <span class="product-name">{@html highlight(product.description, query)}</span>
+              <span class="product-name"
+                >{@html highlight(product.description, query)}</span
+              >
               {#if product.weight_qty}
                 <span class="product-weight">{product.weight_qty}</span>
               {/if}
@@ -216,64 +249,206 @@
 </div>
 
 <style>
-  .results { display: flex; flex-direction: column; gap: 0; }
-  .results-header { padding: 4px 2px 8px; }
-  .results-count { font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo, #555); }
-  .results-shown { font-weight: 400; }
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .results-header {
+    padding: 4px 2px 8px;
+  }
+  .results-count {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-lo, #555);
+  }
+  .results-shown {
+    font-weight: 400;
+  }
 
-  .product-list { display: flex; flex-direction: column; gap: 8px; user-select: none; -webkit-user-select: none; }
+  .product-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
 
-  .product-card { display: flex; background: var(--bg-card, #1a1a1a); border: 1px solid var(--border, #2a2a2a); border-radius: var(--radius, 6px); overflow: hidden; transition: border-color 0.15s; }
-  .product-card.has-stock { border-color: #1c3a28; }
+  .product-card {
+    display: flex;
+    background: var(--bg-card, #1a1a1a);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: var(--radius, 6px);
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .product-card.has-stock {
+    border-color: #1c3a28;
+  }
 
-  .status-bar { width: 4px; flex-shrink: 0; }
-  .stock-ok { background: var(--green, #4ade80); }
-  .stock-no { background: var(--border, #2a2a2a); }
+  .status-bar {
+    width: 4px;
+    flex-shrink: 0;
+  }
+  .stock-ok {
+    background: var(--green, #4ade80);
+  }
+  .stock-no {
+    background: var(--border, #2a2a2a);
+  }
 
-  .product-body { flex: 1; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .product-body {
+    flex: 1;
+    padding: 12px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
 
-  .product-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .product-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .product-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .product-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
 
-  .product-brand { font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 700; color: var(--amber, #f5a623); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-  .product-code { font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-lo, #555); white-space: nowrap; }
+  .product-brand {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--amber, #f5a623);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .product-code {
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    color: var(--text-lo, #555);
+    white-space: nowrap;
+  }
 
-  .product-desc { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .product-name { font-family: var(--font-ui, sans-serif); font-size: 18px; font-weight: 600; color: var(--text-hi, #f0f0f0); line-height: 1.2; }
-  .product-weight { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-mid, #a0a0a0); white-space: nowrap; }
+  .product-desc {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .product-name {
+    font-family: var(--font-ui, sans-serif);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-hi, #f0f0f0);
+    line-height: 1.2;
+  }
+  .product-weight {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--text-mid, #a0a0a0);
+    white-space: nowrap;
+  }
 
-  .product-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .product-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+  }
 
   .add-btn {
-    height: 34px; padding: 0 14px; border-radius: 5px;
-    border: 1.5px solid var(--amber-dim, #b57a1a); background: #1a1200;
-    color: var(--amber, #f5a623); font-family: var(--font-ui, sans-serif);
-    font-size: 14px; font-weight: 700; letter-spacing: 0.03em;
-    cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 5px;
+    border: 1.5px solid var(--amber-dim, #b57a1a);
+    background: #1a1200;
+    color: var(--amber, #f5a623);
+    font-family: var(--font-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
   }
-  .add-btn:active { background: #2a1e00; }
+  .add-btn:active {
+    background: #2a1e00;
+  }
 
   /* Badges */
-  .stock-indicator { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+  .stock-indicator {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 
-  .badge-gray { background: var(--bg, #0d0d0d); color: var(--text-lo, #555); border: 1px solid var(--border, #2a2a2a); }
+  .badge-gray {
+    background: var(--bg, #0d0d0d);
+    color: var(--text-lo, #555);
+    border: 1px solid var(--border, #2a2a2a);
+  }
 
   /* Sin stock sin confirmar: gris apagado, sin borde */
-  .badge-unchecked { opacity: 0.6; font-style: italic; }
+  .badge-unchecked {
+    opacity: 0.6;
+    font-style: italic;
+  }
 
-  :global(mark) { background: #2a1e00; color: var(--amber, #f5a623); border-radius: 2px; padding: 0 1px; }
+  :global(mark) {
+    background: #2a1e00;
+    color: var(--amber, #f5a623);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
 
   /* Cargar más */
-  .load-more-wrap { padding: 16px 0 8px; display: flex; justify-content: center; }
-  .load-more-btn {
-    height: 40px; padding: 0 24px; border-radius: 20px;
-    border: 1.5px solid var(--border-hi, #3a3a3a); background: var(--bg-card, #1a1a1a);
-    color: var(--text-mid, #a0a0a0); font-family: var(--font-mono, monospace);
-    font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s, color 0.15s;
+  .load-more-wrap {
+    padding: 16px 0 8px;
+    display: flex;
+    justify-content: center;
   }
-  .load-more-btn:hover, .load-more-btn:active { border-color: var(--amber, #f5a623); color: var(--amber, #f5a623); }
-  :global(.spin-icon) { animation: spin 1s linear infinite; }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .load-more-btn {
+    height: 40px;
+    padding: 0 24px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border-hi, #3a3a3a);
+    background: var(--bg-card, #1a1a1a);
+    color: var(--text-mid, #a0a0a0);
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.15s,
+      color 0.15s;
+  }
+  .load-more-btn:hover,
+  .load-more-btn:active {
+    border-color: var(--amber, #f5a623);
+    color: var(--amber, #f5a623);
+  }
+  :global(.spin-icon) {
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
 </style>
