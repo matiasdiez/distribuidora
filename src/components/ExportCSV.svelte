@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Download, Loader2 } from 'lucide-svelte';
   import { getStockByProduct } from '../lib/idb';
   import type { Product } from '../lib/supabase';
 
@@ -92,9 +93,9 @@
   title={products.length === 0 ? 'No hay productos para exportar' : `Exportar ${products.length} productos como CSV`}
 >
   {#if exporting}
-    <span class="btn-icon spin">⟳</span> Generando...
+    <Loader2 size={13} class="spin-icon" /> Generando...
   {:else}
-    <span class="btn-icon">↓</span> CSV
+    <Download size={13} strokeWidth={2.5} /> CSV
     {#if products.length > 0}
       <span class="count">({products.length})</span>
     {/if}

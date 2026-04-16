@@ -9,6 +9,7 @@
   import BottomNav from "./BottomNav.svelte";
   import SettingsSheet from "./SettingsSheet.svelte";
   import Login from "./Login.svelte";
+  import { Hexagon, Loader2, X, AlertTriangle, Bell, BellRing } from 'lucide-svelte';
 
   import {
     isInitialized, countProducts, getDepots, getExpiringLots,
@@ -159,16 +160,16 @@
   <Login />
   {#if unauthorizedEmail}
     <div class="unauth-banner">
-      ⚠ Ese email no tiene acceso autorizado.
+      <AlertTriangle size={14} strokeWidth={2.5} /> Ese email no tiene acceso autorizado.
     </div>
   {/if}
 
 <!-- ── Splash de carga ────────────────────────────────────────────── -->
 {:else if !appReady}
   <div class="splash">
-    <div class="splash-logo">⬡</div>
+    <div class="splash-logo"><Hexagon size={48} strokeWidth={1.5} /></div>
     <div class="splash-name">DEPÓSITO</div>
-    <div class="splash-spinner">⟳</div>
+    <div class="splash-spinner"><Loader2 size={30} class="spin" /></div>
     <p class="splash-msg">{initMessage || "Iniciando..."}</p>
   </div>
 
@@ -181,15 +182,15 @@
   <!-- Banner aviso sync matutina no realizada -->
   {#if showSyncWarning}
     <div class="sync-warning-banner">
-      <span>⚠ La base de datos no se actualizó esta mañana.</span>
-      <button class="sync-warning-close" on:click={() => (showSyncWarning = false)}>✕</button>
+      <span class="sync-warn-inner"><AlertTriangle size={14} strokeWidth={2.5} /> La base de datos no se actualizó esta mañana.</span>
+      <button class="sync-warning-close" on:click={() => (showSyncWarning = false)} aria-label="Cerrar"><X size={12} strokeWidth={2.5} /></button>
     </div>
   {/if}
 
   <!-- Header -->
   <header class="app-header">
     <div class="header-brand">
-      <span class="brand-icon">⬡</span>
+      <span class="brand-icon"><Hexagon size={22} strokeWidth={2} /></span>
       <div class="brand-text">
         <span class="brand-title">DEPÓSITO</span>
         <span class="brand-depot">{depot.name}</span>
@@ -205,18 +206,10 @@
       >
         <span class="bell-wrap">
           {#if expiringCount > 0}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
-              <path d="M4 2C2.8 3.7 2 5.7 2 8"/>
-              <path d="M20 2c1.2 1.7 2 3.7 2 6"/>
-            </svg>
+            <BellRing size={20} strokeWidth={2} />
             <span class="bell-badge">{expiringCount > 9 ? "9+" : expiringCount}</span>
           {:else}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
+            <Bell size={20} strokeWidth={2} />
           {/if}
         </span>
       </button>
@@ -270,8 +263,8 @@
     <div class="expiring-backdrop" on:click={() => (showExpiring = false)}>
       <div class="expiring-sheet" on:click|stopPropagation>
         <div class="expiring-header">
-          <span class="expiring-title">🔔 Por vencer (30 días)</span>
-          <button class="expiring-close" on:click={() => (showExpiring = false)}>✕</button>
+          <span class="expiring-title"><BellRing size={16} strokeWidth={2} /> Por vencer (30 días)</span>
+          <button class="expiring-close" on:click={() => (showExpiring = false)} aria-label="Cerrar"><X size={13} strokeWidth={2.5} /></button>
         </div>
         {#if expiringLots.length === 0}
           <p class="expiring-empty">No hay productos por vencer en los próximos 30 días.</p>
@@ -417,6 +410,7 @@
     from { transform: translateY(40px); opacity: 0; }
     to   { transform: translateY(0); opacity: 1; }
   }
+  :global(.spin) { animation: spin 1.2s linear infinite; }
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { ArrowLeft, Hexagon, Loader2, Search, X, CheckSquare, Square, Check, PackageSearch } from 'lucide-svelte';
   import {
     searchProducts,
     getDepots,
@@ -132,15 +133,15 @@
   <!-- ── Header ── -->
   <header class="app-header">
     <div class="header-left">
-      <a href="/" class="back-link" title="Volver">←</a>
-      <div class="app-logo">⬡ CLASIFICAR</div>
+      <a href="/" class="back-link" aria-label="Volver"><ArrowLeft size={18} strokeWidth={2} /></a>
+      <div class="app-logo"><Hexagon size={14} strokeWidth={2.5} /> CLASIFICAR</div>
     </div>
     <SyncStatus />
   </header>
 
   {#if !appReady}
     <div class="splash">
-      <span class="spin">⟳</span>
+      <Loader2 size={28} strokeWidth={1.5} class="spin" />
       <p>Cargando productos...</p>
     </div>
 
@@ -148,7 +149,7 @@
     <!-- ── Buscador ── -->
     <div class="search-wrap">
       <div class="search-box">
-        <span class="s-icon">⌕</span>
+        <span class="s-icon"><Search size={18} strokeWidth={2} /></span>
         <input
           class="s-input"
           type="search"
@@ -161,7 +162,7 @@
           bind:value={query}
         />
         {#if query}
-          <button class="s-clear" on:click={() => query = ''}>✕</button>
+          <button class="s-clear" on:click={() => query = ''} aria-label="Limpiar"><X size={14} strokeWidth={2.5} /></button>
         {/if}
       </div>
     </div>
@@ -196,7 +197,7 @@
     {#if anySelected}
       <div class="action-bar" role="region" aria-label="Asignar seleccionados">
         <div class="action-left">
-          <button class="deselect-btn" on:click={clearSelection}>✕</button>
+          <button class="deselect-btn" on:click={clearSelection} aria-label="Deseleccionar"><X size={14} strokeWidth={2.5} /></button>
           <span class="action-count">{selected.size} seleccionado{selected.size !== 1 ? 's' : ''}</span>
         </div>
         <div class="action-right">
@@ -214,7 +215,7 @@
             on:click={confirm}
             disabled={saving || targetDepotId === undefined}
           >
-            {saving ? '...' : '✓'}
+            {saving ? '...' : ''}{#if !saving}<Check size={16} strokeWidth={3} />{/if}
           </button>
         </div>
       </div>
@@ -223,7 +224,7 @@
     <!-- ── Feedback de guardado ── -->
     {#if savedCount > 0}
       <div class="saved-toast">
-        ✓ {savedCount} producto{savedCount !== 1 ? 's' : ''} asignado{savedCount !== 1 ? 's' : ''}
+        <Check size={14} strokeWidth={3} /> {savedCount} producto{savedCount !== 1 ? 's' : ''} asignado{savedCount !== 1 ? 's' : ''}
       </div>
     {/if}
 
@@ -231,7 +232,7 @@
     <div class="list-header">
       <button class="select-all-btn" on:click={toggleAll}>
         <span class="checkbox" class:checked={selected.size === paginated.length && paginated.length > 0}>
-          {selected.size === paginated.length && paginated.length > 0 ? '☑' : '☐'}
+          {#if selected.size === paginated.length && paginated.length > 0}<CheckSquare size={18} strokeWidth={2} />{:else}<Square size={18} strokeWidth={2} />{/if}
         </span>
         {selected.size === paginated.length && paginated.length > 0 ? 'Deseleccionar' : 'Seleccionar'} página
       </button>
@@ -241,7 +242,7 @@
     <!-- ── Lista de productos ── -->
     {#if filtered.length === 0}
       <div class="empty">
-        <span>∅</span>
+        <PackageSearch size={36} strokeWidth={1.5} />
         <p>{query ? `Sin resultados para "${query}"` : 'No hay productos en este filtro'}</p>
       </div>
     {:else}
@@ -261,9 +262,9 @@
             <!-- Checkbox -->
             <div class="p-check" aria-hidden="true">
               {#if isSelected}
-                <span class="check-icon check-on">☑</span>
+                <span class="check-icon check-on"><CheckSquare size={18} strokeWidth={2} /></span>
               {:else}
-                <span class="check-icon">☐</span>
+                <span class="check-icon"><Square size={18} strokeWidth={2} /></span>
               {/if}
             </div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { Clock, Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-svelte';
   import { onSyncStatus, type SyncStatus } from '../lib/sync';
   import { getPendingSync } from '../lib/idb';
 
@@ -69,7 +70,7 @@
   <!-- Badge pendientes -->
   {#if hasPending}
     <span class="pending-badge" title="{pendingCount} cambio(s) pendientes de sync">
-      ⏳ {pendingCount}
+      <span class="pending-icon"><Clock size={11} strokeWidth={2.5} /></span>{pendingCount}
     </span>
   {/if}
 </div>
@@ -118,6 +119,8 @@
     padding: 2px 6px;
     border-radius: 3px;
   }
+
+  .pending-icon { display: inline-flex; align-items: center; margin-right: 3px; }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; }

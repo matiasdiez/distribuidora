@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Hexagon, Settings, X, Check, ChevronRight, Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import ExportCSV  from './ExportCSV.svelte';
   import { theme, toggleTheme } from '../lib/themeStore';
@@ -122,7 +123,7 @@
           || String(e?.message ?? '').toLowerCase().includes('polic')
           || String(e?.message ?? '').toLowerCase().includes('violat');
         if (isRLS) {
-          createError = '⚠ Depósito creado solo localmente. Para sincronizar con el servidor activá el permiso INSERT en la tabla "depots" de Supabase (RLS).';
+          createError = 'WARN Depósito creado solo localmente. Para sincronizar con el servidor activá el permiso INSERT en la tabla "depots" de Supabase (RLS).';
         }
       } catch (localErr) {
         console.error('Local depot creation also failed:', localErr);
@@ -156,7 +157,7 @@
 
       <div class="sheet-header">
         <span class="sheet-title">Ajustes</span>
-        <button class="close-btn" on:click={close} aria-label="Cerrar">✕</button>
+        <button class="close-btn" on:click={close} aria-label="Cerrar"><X size={14} strokeWidth={2.5} /></button>
       </div>
 
       <!-- Sección: Depósito activo -->
@@ -169,12 +170,12 @@
               class:active={d.id === activeDepot?.id}
               on:click={() => chooseDepot(d)}
             >
-              <span class="depot-icon">⬡</span>
+              <span class="depot-icon"><Hexagon size={16} strokeWidth={2} /></span>
               <span class="depot-name">{d.name}</span>
               {#if d.id === activeDepot?.id}
-                <span class="depot-check">✓</span>
+                <span class="depot-check"><Check size={14} strokeWidth={3} /></span>
               {:else}
-                <span class="depot-arrow">→</span>
+                <span class="depot-arrow"><ChevronRight size={16} strokeWidth={2} /></span>
               {/if}
             </button>
           {/each}
@@ -204,14 +205,14 @@
               on:keydown={(e) => e.key === 'Enter' && handleCreateDepot()}
             />
             {#if createError}
-              <p class="new-depot-error" class:is-warning={createError.startsWith('⚠')}>{createError}</p>
+              <p class="new-depot-error" class:is-warning={createError.startsWith('WARN')}>{createError}</p>
             {/if}
             <div class="new-depot-actions">
               <button class="btn-ghost" on:click={toggleNewDepot} disabled={creatingDepot}>
                 Cancelar
               </button>
               <button class="btn-primary" on:click={handleCreateDepot} disabled={creatingDepot}>
-                {creatingDepot ? 'Creando...' : '✓ Crear'}
+                {creatingDepot ? 'Creando...' : ''}{#if !creatingDepot}<Check size={14} strokeWidth={3} />{/if}{creatingDepot ? ' Creando...' : ' Crear'}
               </button>
             </div>
           </div>
@@ -248,7 +249,7 @@
           on:click={handleForceSync}
           disabled={syncing}
         >
-          <span class="action-icon" class:spin={syncing}>⟳</span>
+          <span class="action-icon">{#if syncing}<Loader2 size={16} class="spin" />{:else}<RefreshCw size={16} strokeWidth={2} />{/if}</span>
           <span class="action-label">
             {#if syncing}
               {syncMessage}
@@ -261,7 +262,7 @@
             {/if}
           </span>
           {#if !syncing && syncResult === 'idle'}
-            <span class="action-badge">↓ DB</span>
+            <span class="action-badge"><Download size={10} strokeWidth={2.5} /> DB</span>
           {/if}
         </button>
         <p class="sync-hint">Sube cambios locales y descarga la base de datos completa.</p>
@@ -274,12 +275,12 @@
         <p class="section-label">Herramientas</p>
         
         <a href="/clasificar" class="action-row" style="margin-bottom: 8px; text-decoration: none; color: inherit;">
-          <span class="action-icon">⬡</span>
+          <span class="action-icon"><Hexagon size={16} strokeWidth={2} /></span>
           <span class="action-label">Clasificar productos</span>
         </a>
 
         <a href="/settings" class="action-row" style="margin-bottom: 12px; text-decoration: none; color: inherit;">
-          <span class="action-icon">⚙</span>
+          <span class="action-icon"><Settings size={16} strokeWidth={2} /></span>
           <span class="action-label">Umbrales de stock</span>
         </a>
 
@@ -635,9 +636,17 @@
     letter-spacing: 0.03em;
   }
 
+  :global(.spin) { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   .sync-row          { transition: border-color 0.15s, color 0.15s; }
+  :global(.spin) { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   .sync-row.sync-ok  { border-color: var(--green, #4ade80); color: var(--green, #4ade80); }
+  :global(.spin) { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   .sync-row.sync-error { border-color: var(--red, #f87171); color: var(--red, #f87171); }
+  :global(.spin) { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   .sync-row:disabled { opacity: 0.7; cursor: not-allowed; }
 
   .sync-hint {

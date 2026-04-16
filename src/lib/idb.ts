@@ -135,13 +135,19 @@ export async function searchProducts(
 
   if (!lowerQ) return products;
 
-  return products.filter(
-    (p) =>
-      p.brand.toLowerCase().includes(lowerQ) ||
-      p.description.toLowerCase().includes(lowerQ) ||
-      p.code.toLowerCase().includes(lowerQ) ||
-      (p.weight_qty ?? "").toLowerCase().includes(lowerQ),
-  );
+  // Separar en tokens y filtrar productos que contengan TODOS los tokens (AND)
+  const tokens = lowerQ.split(/\s+/).filter(Boolean);
+
+  return products.filter((p) => {
+    const haystack = [
+      p.brand,
+      p.description,
+      p.code,
+      p.weight_qty ?? "",
+      p.category,
+    ].join(" ").toLowerCase();
+    return tokens.every((t) => haystack.includes(t));
+  });
 }
 
 export async function assignProductsToDepotLocal(

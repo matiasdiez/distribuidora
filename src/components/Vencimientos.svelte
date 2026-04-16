@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { Hexagon, ArrowLeft, Loader2, AlertTriangle } from "lucide-svelte";
   import { getExpiringLots, getDB } from '../lib/idb';
   import { initialSync, initConnectivityListeners } from '../lib/sync';
   import type { StockEntry } from '../lib/supabase';
@@ -108,8 +109,8 @@
   <!-- Header -->
   <header class="app-header">
     <div class="header-left">
-      <a href="/" class="back-link" title="Volver">←</a>
-      <div class="app-logo">⬡ VENCIMIENTOS</div>
+      <a href="/" class="back-link" aria-label="Volver"><ArrowLeft size={18} strokeWidth={2} /></a>
+      <div class="app-logo"><Hexagon size={14} strokeWidth={2.5} /> VENCIMIENTOS</div>
     </div>
     <button class="export-btn" on:click={exportCSV} title="Exportar CSV" disabled={loading || sorted.length === 0}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -136,7 +137,7 @@
 
   {#if loading}
     <div class="splash">
-      <span class="spin">⟳</span>
+      <Loader2 size={28} strokeWidth={1.5} class="spin" />
       <p>Cargando lotes...</p>
     </div>
 
@@ -166,7 +167,7 @@
 
       <!-- Urgentes (≤7 días) -->
       {#if urgent.length > 0}
-        <div class="section-label label-urgent">⚠ Vencen en 7 días o menos</div>
+        <div class="section-label label-urgent"><AlertTriangle size={12} strokeWidth={2.5} /> Vencen en 7 días o menos</div>
         {#each urgent as lot (lot.id)}
           {@const p = productNames[lot.product_id]}
           {@const days = daysUntil(lot.expiry_date!)}
@@ -460,4 +461,6 @@
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
   }
+  :global(.spin) { animation: spin 1.2s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 </style>

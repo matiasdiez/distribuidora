@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Search, X } from 'lucide-svelte';
   import { searchProducts, getCategories } from "../lib/idb";
   import type { Product } from "../lib/supabase";
 
@@ -48,7 +49,7 @@
 <div class="buscador">
   <!-- Input principal -->
   <div class="search-wrap">
-    <span class="search-icon">⌕</span>
+    <span class="search-icon"><Search size={20} strokeWidth={2} /></span>
     <input
       class="input-field search-input"
       type="search"
@@ -65,7 +66,7 @@
       <button
         class="clear-btn"
         on:click={clearSearch}
-        aria-label="Limpiar búsqueda">✕</button
+        aria-label="Limpiar búsqueda"><X size={16} strokeWidth={2.5} /></button
       >
     {/if}
   </div>
@@ -109,10 +110,10 @@
   .search-icon {
     position: absolute;
     left: 13px;
-    font-size: 22px;
     color: var(--text-lo, #555);
     pointer-events: none;
-    line-height: 1;
+    display: flex;
+    align-items: center;
   }
 
   .search-input {

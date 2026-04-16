@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { Package, ClipboardList, Pencil, X, Calendar, Check, ArrowDown } from 'lucide-svelte';
   import { addStockEntry, getStockByProduct, confirmNoStock } from "../lib/idb";
   import type { Product, StockEntry } from "../lib/supabase";
 
@@ -19,6 +20,40 @@
   let expiryRaw  = "";
   let notes      = "";
   let editingLot: StockEntry | null = null;
+
+  // ── Sin número de lote ───────────────────────────────────────
+  let noLot           = false;  // el producto no tiene nro. de lote
+  let noLotConfirming = false;  // mostrando diálogo de confirmación
+
+  /** Código automático para productos sin lote: SL-AAMM */
+  function autoLotCode(): string {
+    const now = new Date();
+    const yy  = now.getFullYear().toString().slice(2);
+    const mm  = String(now.getMonth() + 1).padStart(2, '0');
+    return `SL-${yy}${mm}`;
+  }
+
+  function requestNoLot() {
+    if (noLot) {
+      // Ya activo → desactivar y volver a campo manual
+      noLot     = false;
+      lotNumber = '';
+      expiryRaw = '';
+    } else {
+      noLotConfirming = true;
+    }
+  }
+
+  function confirmNoLot() {
+    noLot           = true;
+    noLotConfirming = false;
+    lotNumber       = autoLotCode();
+    expiryRaw       = '';  // sin fecha de vencimiento
+  }
+
+  function cancelNoLot() {
+    noLotConfirming = false;
+  }
 
   /**
    * Modo de operación:
@@ -89,14 +124,16 @@
   $: if (open && product) { loadLots(); resetForm(); }
 
   function resetForm() {
-    lotNumber  = "";
-    quantity   = "";
-    boxes      = "";
-    expiryRaw  = "";
-    notes      = "";
-    editingLot = null;
-    mode       = 'add';
-    error      = "";
+    lotNumber        = "";
+    quantity         = "";
+    boxes            = "";
+    expiryRaw        = "";
+    notes            = "";
+    editingLot       = null;
+    mode             = 'add';
+    noLot            = false;
+    noLotConfirming  = false;
+    error            = "";
   }
 
   async function loadLots() {
@@ -224,7 +261,7 @@
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="backdrop" on:click={handleBackdrop}>
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Stock">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Stock" style="position:relative;">
 
       <!-- ── Header ──────────────────────────────────────────── -->
       <div class="modal-header">
@@ -238,7 +275,7 @@
             </span>
           {/if}
         </div>
-        <button class="close-btn" on:click={close} aria-label="Cerrar">✕</button>
+        <button class="close-btn" on:click={close} aria-label="Cerrar"><X size={14} strokeWidth={2.5} /></button>
       </div>
 
       <!-- ── Lotes existentes ────────────────────────────────── -->
@@ -266,7 +303,7 @@
                     {new Date(lot.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}
                   {/if}
                 </span>
-                <span class="lot-edit-hint">✏</span>
+                <span class="lot-edit-hint"><Pencil size={11} strokeWidth={2} /></span>
               </button>
             {/each}
           </div>
@@ -295,7 +332,7 @@
               class:active={mode === 'add'}
               on:click={() => { mode = 'add'; quantity = ""; boxes = ""; }}
             >
-              <span class="mode-icon">📦</span>
+              <span class="mode-icon"><Package size={20} strokeWidth={1.5} /></span>
               <span class="mode-label">Recepción</span>
               <span class="mode-desc">Llegó mercadería — suma al stock</span>
             </button>
@@ -304,7 +341,7 @@
               class:active={mode === 'set'}
               on:click={() => { mode = 'set'; fillWithCurrentLot(); }}
             >
-              <span class="mode-icon">🔍</span>
+              <span class="mode-icon"><ClipboardList size={20} strokeWidth={1.5} /></span>
               <span class="mode-label">Inventario</span>
               <span class="mode-desc">Conteo real — reemplaza el stock</span>
             </button>
@@ -323,10 +360,25 @@
 
         <!-- Nro. de lote -->
         <div class="field-group">
-          <label class="field-label" for="lot-input">Nro. de lote</label>
+          <div class="lot-label-row">
+            <label class="field-label" for="lot-input">Nro. de lote</label>
+            {#if !editingLot}
+              <button
+                type="button"
+                class="no-lot-toggle"
+                class:active={noLot}
+                on:click={requestNoLot}
+                title="El producto no tiene número de lote impreso"
+              >
+                {noLot ? '✓ Sin nro. de lote' : 'Sin nro. de lote'}
+              </button>
+            {/if}
+          </div>
           <input
             id="lot-input"
             class="input-field"
+            class:input-readonly={!!editingLot || noLot}
+            class:lot-auto={noLot}
             type="text"
             inputmode="text"
             autocomplete="off"
@@ -334,10 +386,17 @@
             autocapitalize="characters"
             placeholder="Ej: L2024-001"
             bind:value={lotNumber}
-            readonly={!!editingLot}
-            class:input-readonly={!!editingLot}
+            readonly={!!editingLot || noLot}
           />
+          {#if noLot}
+            <p class="no-lot-hint">
+              Código automático generado por el sistema. El vencimiento queda sin fecha.
+            </p>
+          {/if}
         </div>
+
+        <!-- Vencimiento: ocultar cuando no hay lote -->
+        {#if !noLot}
 
         <!-- Unidades + Cajas -->
         <div class="qty-row">
@@ -388,7 +447,7 @@
               <span class="preview-value">{formatQty(previewUnits, previewBoxes)}</span>
               {#if previewUnits < currentLotUnits || previewBoxes < currentLotBoxes}
                 <span class="preview-diff preview-down">
-                  ↓ baja de {formatQty(currentLotUnits, currentLotBoxes)}
+                  <ArrowDown size={12} strokeWidth={2.5} /> baja de {formatQty(currentLotUnits, currentLotBoxes)}
                 </span>
               {:else if previewUnits > currentLotUnits || previewBoxes > currentLotBoxes}
                 <span class="preview-diff preview-up">
@@ -415,7 +474,7 @@
               autocomplete="off"
             />
             <label class="expiry-picker-btn" title="Elegir fecha">
-              📅
+              <Calendar size={18} strokeWidth={1.5} />
               <input
                 type="date"
                 class="expiry-picker-hidden"
@@ -425,6 +484,8 @@
             </label>
           </div>
         </div>
+
+        {/if}
 
         <!-- Notas -->
         <div class="field-group">
@@ -443,6 +504,26 @@
           <p class="error-msg">{error}</p>
         {/if}
       </div>
+
+      <!-- ── Diálogo confirmación "sin nro. de lote" ─────────── -->
+      {#if noLotConfirming}
+        <div class="no-lot-overlay">
+          <div class="no-lot-dialog">
+            <p class="no-lot-dialog-title">¿Confirmar sin número de lote?</p>
+            <p class="no-lot-dialog-body">
+              Este producto no tiene número de lote ni fecha de vencimiento impresos.
+              El sistema usará el código <strong>{autoLotCode()}</strong> para identificarlo.
+            </p>
+            <p class="no-lot-dialog-warn">
+              Asegurate de haber revisado el envase antes de confirmar.
+            </p>
+            <div class="no-lot-dialog-actions">
+              <button class="btn btn-ghost" on:click={cancelNoLot}>Cancelar</button>
+              <button class="btn btn-primary" on:click={confirmNoLot}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      {/if}
 
       <!-- ── Footer ──────────────────────────────────────────── -->
       <div class="modal-footer">
@@ -635,4 +716,40 @@
   }
   .btn-no-stock.confirmed { border-color: var(--red, #f87171); color: var(--red, #f87171); background: #2a0a0a; }
   .btn-no-stock:not(.confirmed):hover, .btn-no-stock:not(.confirmed):active { border-color: var(--red, #f87171); color: var(--red, #f87171); }
+
+  /* Sin número de lote */
+  .lot-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .no-lot-toggle {
+    font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 700;
+    padding: 3px 9px; border-radius: 4px; letter-spacing: 0.04em; text-transform: uppercase;
+    border: 1px solid var(--border-hi, #3a3a3a); background: none;
+    color: var(--text-lo, #555); cursor: pointer;
+    -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .no-lot-toggle.active { border-color: var(--amber, #f5a623); color: var(--amber, #f5a623); background: #2a1e00; }
+  .lot-auto { color: var(--amber, #f5a623) !important; font-style: italic; letter-spacing: 0.06em; }
+  .no-lot-hint { font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-lo, #555); margin-top: 2px; line-height: 1.4; }
+
+  /* Diálogo confirmación sin lote */
+  .no-lot-overlay {
+    position: absolute; inset: 0; z-index: 10;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; border-radius: 16px 16px 0 0;
+  }
+  .no-lot-dialog {
+    background: var(--bg-card, #1a1a1a);
+    border: 1px solid var(--amber-dim, #b57a1a);
+    border-radius: 12px;
+    padding: 20px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+    max-width: 340px; width: 100%;
+  }
+  .no-lot-dialog-title { font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 700; color: var(--amber, #f5a623); text-transform: uppercase; letter-spacing: 0.06em; }
+  .no-lot-dialog-body { font-family: var(--font-ui, sans-serif); font-size: 14px; color: var(--text-mid, #a0a0a0); line-height: 1.5; }
+  .no-lot-dialog-body strong { color: var(--amber, #f5a623); font-family: var(--font-mono, monospace); }
+  .no-lot-dialog-warn { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--red, #f87171); background: var(--red-dim, #7f1d1d); padding: 6px 10px; border-radius: 4px; line-height: 1.4; }
+  .no-lot-dialog-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .no-lot-dialog-actions .btn-ghost { flex-shrink: 0; }
+  .no-lot-dialog-actions .btn-primary { flex: 1; }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { Hexagon, ArrowLeft, Check } from "lucide-svelte";
   import {
     loadThresholds,
     saveThresholds,
@@ -68,8 +69,8 @@
   <!-- Header -->
   <header class="app-header">
     <div class="header-left">
-      <a href="/" class="back-link" title="Volver">←</a>
-      <div class="app-logo">⬡ AJUSTES</div>
+      <a href="/" class="back-link" aria-label="Volver"><ArrowLeft size={18} strokeWidth={2} /></a>
+      <div class="app-logo"><Hexagon size={14} strokeWidth={2.5} /> AJUSTES</div>
     </div>
   </header>
 
@@ -193,7 +194,7 @@
           disabled={saving}
         >
           {#if saved}
-            ✓ Guardado
+            <Check size={13} strokeWidth={3} /> Guardado
           {:else if saving}
             Guardando...
           {:else}

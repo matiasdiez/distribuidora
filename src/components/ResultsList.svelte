@@ -1,10 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
+  import { Loader2, PackageSearch, SearchX, Package } from 'lucide-svelte';
   import { getStockByProduct } from "../lib/idb";
   import {
     loadThresholds, calcFreshness, type FreshnessThresholds,
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
+  import { Loader2, PackageSearch, Package } from 'lucide-svelte';
   import type { Product } from "../lib/supabase";
 
   export let products: Product[] = [];
@@ -117,17 +119,17 @@
 <div class="results">
   {#if isLoading}
     <div class="empty-state">
-      <span class="empty-icon">⟳</span>
+      <span class="empty-icon"><Loader2 size={28} strokeWidth={1.5} class="spin-icon" /></span>
       <span>Buscando...</span>
     </div>
   {:else if products.length === 0 && query.length > 0}
     <div class="empty-state">
-      <span class="empty-icon">∅</span>
+      <span class="empty-icon"><SearchX size={28} strokeWidth={1.5} /></span>
       <span>Sin resultados para <strong>"{query}"</strong></span>
     </div>
   {:else if products.length === 0}
     <div class="empty-state">
-      <span class="empty-icon">📦</span>
+      <span class="empty-icon"><PackageSearch size={28} strokeWidth={1.5} /></span>
       <span>Escribí para buscar productos</span>
     </div>
   {:else}
@@ -219,7 +221,7 @@
   .results-count { font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo, #555); }
   .results-shown { font-weight: 400; }
 
-  .product-list { display: flex; flex-direction: column; gap: 8px; }
+  .product-list { display: flex; flex-direction: column; gap: 8px; user-select: none; -webkit-user-select: none; }
 
   .product-card { display: flex; background: var(--bg-card, #1a1a1a); border: 1px solid var(--border, #2a2a2a); border-radius: var(--radius, 6px); overflow: hidden; transition: border-color 0.15s; }
   .product-card.has-stock { border-color: #1c3a28; }
@@ -272,4 +274,6 @@
     transition: border-color 0.15s, color 0.15s;
   }
   .load-more-btn:hover, .load-more-btn:active { border-color: var(--amber, #f5a623); color: var(--amber, #f5a623); }
+  :global(.spin-icon) { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

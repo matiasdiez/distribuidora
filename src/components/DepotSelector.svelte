@@ -1,4 +1,6 @@
-<script lang="ts">
+<script
+ lang="ts">
+  import { Hexagon, Loader2, ChevronRight } from "lucide-svelte";
   import { createEventDispatcher } from "svelte";
   import { getDepots } from "../lib/idb";
   import { setActiveDepot } from "../lib/depotStore";
@@ -16,13 +18,13 @@
 
 <div class="selector-screen">
   <div class="selector-head">
-    <div class="logo">⬡ DEPÓSITO</div>
+    <div class="logo"><Hexagon size={14} strokeWidth={2.5} /> DEPÓSITO</div>
     <p class="subtitle">Seleccioná tu depósito</p>
   </div>
 
   {#if depots.length === 0}
     <div class="empty">
-      <span class="spin">⟳</span>
+      <Loader2 size={28} strokeWidth={1.5} class="spin" />
       <p>Cargando depósitos...</p>
     </div>
   {:else}
@@ -30,9 +32,9 @@
       {#each depots as depot}
         <li>
           <button class="depot-btn" on:click={() => choose(depot)}>
-            <span class="depot-icon">⬡</span>
+            <span class="depot-icon"><Hexagon size={18} strokeWidth={2} /></span>
             <span class="depot-name">{depot.name}</span>
-            <span class="depot-arrow">→</span>
+            <span class="depot-arrow"><ChevronRight size={16} strokeWidth={2} /></span>
           </button>
         </li>
       {/each}
@@ -48,7 +50,7 @@
         >
           <span class="depot-icon unassigned-icon">◌</span>
           <span class="depot-name">Sin depósito</span>
-          <span class="depot-arrow">→</span>
+          <span class="depot-arrow"><ChevronRight size={16} strokeWidth={2} /></span>
         </button>
       </li>
     </ul>
@@ -204,4 +206,6 @@
       transform: rotate(360deg);
     }
   }
+  :global(.spin) { animation: spin 1.2s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 </style>

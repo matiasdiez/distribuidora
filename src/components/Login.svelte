@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Hexagon, Loader2 } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import { signInWithGoogle } from '../lib/auth';
 
@@ -22,7 +23,7 @@
 
 <div class="login-screen">
   <div class="login-card">
-    <div class="login-logo">⬡</div>
+    <div class="login-logo"><Hexagon size={48} strokeWidth={1.5} /></div>
     <h1 class="login-title">DEPÓSITO</h1>
     <p class="login-subtitle">Iniciá sesión para continuar</p>
 
@@ -36,7 +37,7 @@
       disabled={loading}
     >
       {#if loading}
-        <span class="spin">⟳</span>
+        <Loader2 size={18} class="spin" />
         Conectando...
       {:else}
         <!-- Google G icon -->
@@ -162,6 +163,7 @@
     font-size: 18px;
   }
 
+  :global(.spin) { animation: spin 1s linear infinite; }
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }

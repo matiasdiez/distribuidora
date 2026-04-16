@@ -11,6 +11,7 @@
   } from "../lib/freshness";
   import { loadSavedDepot } from "../lib/depotStore";
   import { initTheme } from "../lib/themeStore";
+  import { Hexagon, ArrowLeft, ArrowRight, Search, X, Loader2 } from "lucide-svelte";
   import SwipeCard from "./SwipeCard.svelte";
   import SyncStatus from "./SyncStatus.svelte";
   import FreshnessDot from "./FreshnessDot.svelte";
@@ -121,7 +122,7 @@
         : allProducts.filter((p) => p.category === selectedCategory);
     const source = catalogMode
       ? catSource
-      : catSource.filter((p) => p.depot_id === depotId || p.depot_id == null);
+      : catSource.filter((p) => p.depot_id === depotId);
     brands = [...new Set(source.map((p) => p.brand))].sort();
   }
 
@@ -156,7 +157,7 @@
     // En modo catálogo mostramos todos; en modo depósito filtramos
     const byDepot = catalogMode
       ? source
-      : source.filter((p) => p.depot_id === depotId || p.depot_id == null);
+      : source.filter((p) => p.depot_id === depotId);
     products = byDepot.filter((p) => p.brand === brand);
   }
 
@@ -316,13 +317,11 @@
   <header class="app-header">
     <div class="header-left">
       {#if selectedBrand}
-        <button class="back-btn" on:click={clearBrand} aria-label="Volver"
-          >←</button
-        >
+        <button class="back-btn" on:click={clearBrand} aria-label="Volver"><ArrowLeft size={18} strokeWidth={2} /></button>
         <span class="header-brand">{selectedBrand}</span>
       {:else}
         <div class="header-brand-context">
-          <span class="brand-icon">⬡</span>
+          <span class="brand-icon"><Hexagon size={18} strokeWidth={2} /></span>
           <div class="brand-text">
             <span class="brand-title">SWIPE</span>
           </div>
@@ -334,7 +333,7 @@
 
   {#if !appReady}
     <div class="splash">
-      <span class="spin">⟳</span>
+      <Loader2 size={28} strokeWidth={1.5} class="spin" />
       <p>Cargando productos...</p>
     </div>
   {:else if !selectedBrand}
@@ -342,7 +341,7 @@
     <div class="selector-wrap">
       <!-- Campo de búsqueda -->
       <div class="brand-search-wrap">
-        <span class="search-icon">⌕</span>
+        <span class="search-icon"><Search size={16} strokeWidth={2} /></span>
         <input
           class="brand-search"
           type="search"
@@ -356,8 +355,7 @@
           <button
             class="search-clear"
             on:click={() => (brandSearch = "")}
-            aria-label="Limpiar búsqueda">✕</button
-          >
+            aria-label="Limpiar búsqueda"><X size={12} strokeWidth={2.5} /></button>
         {/if}
       </div>
 
@@ -469,8 +467,7 @@
           class:disabled={currentIndex === 0}
           on:click={goPrev}
           disabled={currentIndex === 0 || isAnimating}
-          aria-label="Producto anterior">←</button
-        >
+          aria-label="Producto anterior"><ArrowLeft size={20} strokeWidth={2} /></button>
 
         <span
           class="nav-dots"
@@ -498,8 +495,7 @@
           class:disabled={currentIndex === products.length - 1}
           on:click={goNext}
           disabled={currentIndex === products.length - 1 || isAnimating}
-          aria-label="Producto siguiente">→</button
-        >
+          aria-label="Producto siguiente"><ArrowRight size={20} strokeWidth={2} /></button>
       </div>
     </div>
   {/if}
@@ -967,6 +963,7 @@
     background: var(--amber, #f5a623);
   }
 
+  :global(.spin) { animation: spin 1.2s linear infinite; }
   @keyframes spin {
     from {
       transform: rotate(0deg);

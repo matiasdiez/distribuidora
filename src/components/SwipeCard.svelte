@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { getStockByProduct } from "../lib/idb";
+  import { ArrowLeft, ArrowRight, Check } from "lucide-svelte";
   import StockModal from "./StockModal.svelte";
   import type { Product, StockEntry } from "../lib/supabase";
 
@@ -69,7 +70,7 @@
   <div class="card-pos">
     <span class="pos-text">{index + 1} / {total}</span>
     {#if saved}
-      <span class="pos-saved">✓ Guardado</span>
+      <span class="pos-saved"><Check size={11} strokeWidth={3} /> Guardado</span>
     {/if}
   </div>
 
@@ -132,8 +133,8 @@
 
   <!-- Hint de swipe -->
   <div class="swipe-hint">
-    {#if index > 0}<span>← anterior</span>{:else}<span></span>{/if}
-    {#if index < total - 1}<span>siguiente →</span>{:else}<span></span>{/if}
+    {#if index > 0}<span><ArrowLeft size={12} strokeWidth={2} /> anterior</span>{:else}<span></span>{/if}
+    {#if index < total - 1}<span>siguiente <ArrowRight size={12} strokeWidth={2} /></span>{:else}<span></span>{/if}
   </div>
 </div>
 
