@@ -3,6 +3,7 @@
   import { Hexagon, ArrowLeft, Loader2, AlertTriangle } from "lucide-svelte";
   import { getExpiringLots, getDB } from '../lib/idb';
   import { initialSync, initConnectivityListeners } from '../lib/sync';
+  import { initTheme } from '../lib/themeStore';
   import type { StockEntry } from '../lib/supabase';
 
   // Días a mostrar — se puede cambiar con las tabs
@@ -13,6 +14,7 @@
   let loading = true;
 
   onMount(async () => {
+    initTheme();
     const cleanup = initConnectivityListeners();
     await initialSync();
     await load();

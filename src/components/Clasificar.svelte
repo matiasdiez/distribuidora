@@ -8,6 +8,7 @@
     countProducts,
   } from '../lib/idb';
   import { initialSync, initConnectivityListeners } from '../lib/sync';
+  import { initTheme } from '../lib/themeStore';
   import SyncStatus from './SyncStatus.svelte';
   import type { Product, Depot } from '../lib/supabase';
 
@@ -30,6 +31,7 @@
 
   // ── Inicialización ────────────────────────────────────────────────────────
   onMount(async () => {
+    initTheme();
     const cleanup = initConnectivityListeners(DEPOT_ID);
     await initialSync(DEPOT_ID);
     depots      = await getDepots();
