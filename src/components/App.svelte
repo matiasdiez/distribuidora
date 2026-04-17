@@ -142,7 +142,7 @@
   function handleCategoryChange(cat: string) { activeCategory = cat; }
 
   function openModal(e: CustomEvent<{ product: Product }>) {
-    if (depotId === "unassigned" || catalogMode) return;
+    if (depotId === "unassigned") return;
     selectedProduct = e.detail.product;
     modalOpen = true;
   }
@@ -241,6 +241,7 @@
         {isLoading}
         depotId={searchDepot}
         query={searchQuery}
+        activeDepotId={depotId}
         on:addStock={openModal}
       />
     {/key}

@@ -14,6 +14,12 @@
   export let isLoading: boolean = false;
   export let depotId: number | "unassigned" | undefined = 1;
   export let query: string = "";
+  // En modo catálogo, depotId es undefined (sin filtro), pero aún queremos
+  // mostrar el botón + Stock usando el depósito activo del parent.
+  export let activeDepotId: number | "unassigned" | undefined = undefined;
+
+  // El ID que se usa para el botón + Stock (prioridad: activeDepotId si está, sino depotId)
+  $: stockDepotId = activeDepotId ?? depotId;
 
   const dispatch = createEventDispatcher<{ addStock: { product: Product } }>();
 
@@ -222,7 +228,7 @@
 
             <div class="product-bottom">
               <span class="badge badge-blue">{product.category}</span>
-              {#if depotId !== "unassigned" && depotId !== undefined}
+              {#if typeof stockDepotId === "number"}
                 <button
                   class="add-btn"
                   on:click={() => openModal(product)}

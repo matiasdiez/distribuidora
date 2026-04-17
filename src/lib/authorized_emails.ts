@@ -7,8 +7,8 @@
  * La comparación es case-insensitive (no importa mayúsculas/minúsculas).
  */
 const AUTHORIZED_EMAILS: string[] = [
-  'por ejemplo:
-  // gerente@miempresa.com',
+  // por ejemplo:
+  // gerente@miempresa.com
   'matiasdiez@gmail.com',
   'matiasluisdiez@gmail.com',
 ];
