@@ -321,9 +321,10 @@
         <p class="sync-hint">Sube cambios locales y descarga la base de datos completa.</p>
       </section>
 
+      {#if false}
+      <!-- TEMPORALMENTE OCULTO — pendiente rediseño de categorías -->
       <div class="divider"></div>
 
-      <!-- Sección: Categorías -->
       <section class="section">
         <p class="section-label">Categorías</p>
 
@@ -373,6 +374,9 @@
           {#if catError}<p class="cat-error">{catError}</p>{/if}
         {/if}
       </section>
+
+      <div class="divider"></div>
+      {/if}
 
       <div class="divider"></div>
 

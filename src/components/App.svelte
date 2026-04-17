@@ -288,6 +288,7 @@
             {/each}
           </div>
         {/if}
+        <a href="/vencimientos" class="expiring-full-link">Ver página completa →</a>
       </div>
     </div>
   {/if}
@@ -406,6 +407,21 @@
   .expiring-qty { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--text-mid, #a0a0a0); }
   .expiring-days { font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 700; color: var(--text-mid, #a0a0a0); white-space: nowrap; flex-shrink: 0; }
   .expiring-days.urgent { color: var(--red, #f87171); }
+  .expiring-full-link {
+    display: block;
+    text-align: center;
+    padding: 14px 16px;
+    border-top: 1px solid var(--border, #2a2a2a);
+    color: var(--amber, #f5a623);
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+  }
+  .expiring-full-link:active { background: #2a1e00; }
 
   @keyframes slide-up {
     from { transform: translateY(40px); opacity: 0; }
