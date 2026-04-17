@@ -4,13 +4,35 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 6; // v6: stock_history + confirmNoStock + SET mode
+const DB_VERSION = 7; // v7: sub_depots + brand_notes
 
 export type PendingSync =
   | {
       id?: number;
       type: "stock_upsert";
       payload: Omit<StockEntry, "id" | "created_at">;
+      created_at: string;
+    }
+  | {
+      /**
+       * Historial de un lote MODIFICADO (no aplica a lotes nuevos).
+       * Se encola SIEMPRE después de su stock_upsert correspondiente.
+       * Se sincroniza vía RPC upsert_stock_with_history para atomicidad,
+       * pero si por alguna razón se procesa solo, inserta solo el historial.
+       */
+      id?: number;
+      type: "stock_history_insert";
+      payload: {
+        product_id:   number;
+        depot_id:     number;
+        lot_number:   string;
+        old_quantity: number;
+        old_boxes:    number;
+        new_quantity: number;
+        new_boxes:    number;
+        move_type:    MoveType;
+        changed_at:   string;
+      };
       created_at: string;
     }
   | {
@@ -24,9 +46,54 @@ export type PendingSync =
       type: "depot_create";
       payload: { name: string; temp_id: number };
       created_at: string;
+    }
+  | {
+      id?: number;
+      type: "brand_note_upsert";
+      payload: Omit<BrandNote, 'id'>;
+      created_at: string;
+    }
+  | {
+      id?: number;
+      type: "brand_note_delete";
+      payload: { remote_id: number };
+      created_at: string;
+    }
+  | {
+      id?: number;
+      type: "sub_depot_create";
+      payload: { depot_id: number; name: string; temp_id: number };
+      created_at: string;
+    }
+  | {
+      id?: number;
+      type: "product_sub_depot_assign";
+      payload: { product_ids: number[]; sub_depot_id: number | null };
+      created_at: string;
     };
 
 export type MoveType = 'recepcion' | 'inventario';
+export type NoteStatus   = 'open' | 'done';
+export type NotePriority = 'low'  | 'normal' | 'high';
+
+export interface SubDepot {
+  id:       number;
+  depot_id: number;
+  name:     string;
+}
+
+export interface BrandNote {
+  id?:        number;  // autoincrement local
+  remote_id?: number;  // id en Supabase (null hasta sincronizar)
+  brand:      string;
+  content:    string;
+  status:     NoteStatus;
+  priority:   NotePriority;
+  due_date:   string | null;  // ISO date YYYY-MM-DD
+  created_at: string;
+  updated_at: string;
+  _deleted?:  boolean;  // marcada para borrar en pending_sync
+}
 
 export interface StockHistoryEntry {
   id?: number;
@@ -58,6 +125,12 @@ interface DepostioDB {
     indexes: { by_product: number };
   };
   depots: { key: number; value: Depot };
+  sub_depots: { key: number; value: SubDepot; indexes: { by_depot: number } };
+  brand_notes: {
+    key: number;
+    value: BrandNote;
+    indexes: { by_brand: string; by_status: string };
+  };
   pending_sync: { key: number; value: PendingSync };
   meta: { key: string; value: { key: string; value: string } };
 }
@@ -90,10 +163,21 @@ export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
         try { transaction.objectStore("meta").delete("last_sync"); transaction.objectStore("meta").delete("initialized"); } catch {}
       }
       if (oldVersion < 6) {
-        // v6: historial de cambios de stock
         if (!db.objectStoreNames.contains("stock_history")) {
           const hs = db.createObjectStore("stock_history", { keyPath: "id", autoIncrement: true });
           hs.createIndex("by_product", "product_id");
+        }
+      }
+      if (oldVersion < 7) {
+        // v7: sub-depósitos y notas/tareas de marca
+        if (!db.objectStoreNames.contains("sub_depots")) {
+          const sd = db.createObjectStore("sub_depots", { keyPath: "id", autoIncrement: true });
+          sd.createIndex("by_depot", "depot_id");
+        }
+        if (!db.objectStoreNames.contains("brand_notes")) {
+          const bn = db.createObjectStore("brand_notes", { keyPath: "id", autoIncrement: true });
+          bn.createIndex("by_brand",  "brand");
+          bn.createIndex("by_status", "status");
         }
       }
     },
@@ -274,19 +358,45 @@ export async function addStockEntry(
     });
   }
 
-  // Payload de sync siempre lleva el total final (no el delta)
-  // para que el upsert en Supabase quede con el valor correcto
-  tx.objectStore("pending_sync").add({
-    type: "stock_upsert",
-    payload: {
-      ...entry,
-      quantity:    finalQty,
-      boxes:       finalBoxes,
-      expiry_date: entry.expiry_date ?? null,
-      depot_id:    depotId,
-    },
-    created_at: now,
-  });
+  // Payload de sync siempre lleva el total final (no el delta).
+  // Para lotes existentes usamos la RPC atómica que combina stock_upsert
+  // e historial en una sola transacción de base de datos.
+  // Para lotes nuevos usamos solo stock_upsert (no hay historial previo).
+  if (existing) {
+    // Lote existente: encolamos un item unificado que la RPC maneja
+    // en una transacción atómica en Supabase.
+    tx.objectStore("pending_sync").add({
+      type: "stock_upsert",
+      payload: {
+        ...entry,
+        quantity:    finalQty,
+        boxes:       finalBoxes,
+        expiry_date: entry.expiry_date ?? null,
+        depot_id:    depotId,
+        // Campos extra para la RPC (ignorados por upsertStockEntry fallback)
+        _history: {
+          old_quantity: existing.quantity,
+          old_boxes:    existing.boxes ?? 0,
+          move_type:    mode === 'add' ? 'recepcion' : 'inventario',
+          changed_at:   now,
+        },
+      },
+      created_at: now,
+    });
+  } else {
+    // Lote nuevo: sin historial previo
+    tx.objectStore("pending_sync").add({
+      type: "stock_upsert",
+      payload: {
+        ...entry,
+        quantity:    finalQty,
+        boxes:       finalBoxes,
+        expiry_date: entry.expiry_date ?? null,
+        depot_id:    depotId,
+      },
+      created_at: now,
+    });
+  }
 
   await tx.done;
 }
@@ -397,6 +507,118 @@ export async function getMeta(key: string): Promise<string | null> {
   const db = await getDB();
   const row = await db.get("meta", key);
   return row?.value ?? null;
+}
+
+// ── Sub-depósitos ─────────────────────────────────────────────
+
+export async function saveSubDepots(items: SubDepot[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("sub_depots", "readwrite");
+  await Promise.all([...items.map((s) => tx.store.put(s)), tx.done]);
+}
+
+export async function getSubDepots(depotId?: number): Promise<SubDepot[]> {
+  const db = await getDB();
+  if (typeof depotId === "number") {
+    return db.getAllFromIndex("sub_depots", "by_depot", depotId);
+  }
+  return db.getAll("sub_depots");
+}
+
+export async function assignProductsToSubDepotLocal(
+  productIds: number[],
+  subDepotId: number | null,
+): Promise<void> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  const tx = db.transaction(["products", "pending_sync"], "readwrite");
+  await Promise.all(
+    productIds.map(async (id) => {
+      const p = await tx.objectStore("products").get(id);
+      if (p) tx.objectStore("products").put({ ...p, sub_depot_id: subDepotId });
+    }),
+  );
+  tx.objectStore("pending_sync").add({
+    type: "product_sub_depot_assign",
+    payload: { product_ids: productIds, sub_depot_id: subDepotId },
+    created_at: now,
+  });
+  await tx.done;
+}
+
+// ── Notas / Tareas de marca ───────────────────────────────────
+
+export async function saveBrandNote(
+  note: Omit<BrandNote, 'id' | 'created_at' | 'updated_at'>,
+): Promise<BrandNote> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  const full: BrandNote = {
+    ...note,
+    created_at: now,
+    updated_at: now,
+  };
+  const id = await db.add("brand_notes", full);
+  const saved = { ...full, id: id as number };
+
+  // Encolar sync
+  const pending = await getDB();
+  await pending.add("pending_sync", {
+    type: "brand_note_upsert",
+    payload: { ...saved },
+    created_at: now,
+  } as any);
+
+  return saved;
+}
+
+export async function updateBrandNote(
+  id: number,
+  patch: Partial<Omit<BrandNote, 'id' | 'created_at'>>,
+): Promise<void> {
+  const db = await getDB();
+  const existing = await db.get("brand_notes", id);
+  if (!existing) return;
+  const now = new Date().toISOString();
+  const updated = { ...existing, ...patch, updated_at: now };
+  await db.put("brand_notes", updated);
+
+  await db.add("pending_sync", {
+    type: "brand_note_upsert",
+    payload: { ...updated },
+    created_at: now,
+  } as any);
+}
+
+export async function deleteBrandNote(id: number): Promise<void> {
+  const db = await getDB();
+  const note = await db.get("brand_notes", id);
+  const now = new Date().toISOString();
+  await db.delete("brand_notes", id);
+  if (note?.remote_id) {
+    await db.add("pending_sync", {
+      type: "brand_note_delete",
+      payload: { remote_id: note.remote_id },
+      created_at: now,
+    } as any);
+  }
+}
+
+export async function getBrandNotes(brand?: string): Promise<BrandNote[]> {
+  const db = await getDB();
+  if (brand) return db.getAllFromIndex("brand_notes", "by_brand", brand);
+  return db.getAll("brand_notes");
+}
+
+export async function getAllBrandNotes(): Promise<BrandNote[]> {
+  const db = await getDB();
+  return db.getAll("brand_notes");
+}
+
+export async function saveBrandNotesFromRemote(notes: BrandNote[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("brand_notes", "readwrite");
+  await Promise.all([...notes.map((n) => tx.store.put(n)), tx.done]);
 }
 
 export async function isInitialized(): Promise<boolean> {

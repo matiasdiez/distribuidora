@@ -30,6 +30,41 @@ export interface Depot {
   name: string;
 }
 
+// Fila de historial tal como la devuelve Supabase
+export interface StockHistoryRemote {
+  id:           number;
+  product_id:   number;
+  depot_id:     number;
+  lot_number:   string;
+  old_quantity: number;
+  old_boxes:    number;
+  new_quantity: number;
+  new_boxes:    number;
+  move_type:    'recepcion' | 'inventario';
+  changed_at:   string;
+}
+
+export interface Category {
+  name: string;
+}
+
+export interface SubDepot {
+  id:       number;
+  depot_id: number;
+  name:     string;
+}
+
+export interface BrandNoteRemote {
+  id:         number;
+  brand:      string;
+  content:    string;
+  status:     'open' | 'done';
+  priority:   'low' | 'normal' | 'high';
+  due_date:   string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StockSummary {
   product_id: number;
   code: string;
@@ -151,6 +186,136 @@ export async function insertProducts(
     .from("products")
     .upsert(products, { onConflict: "code" });
 
+  if (error) throw error;
+}
+
+/**
+ * Upsert atómico: actualiza stock_entries e inserta en stock_history
+ * en una sola transacción de PostgreSQL via RPC.
+ *
+ * Si _history es undefined, el lote es nuevo y no se genera historial.
+ */
+export async function upsertStockWithHistory(
+  entry: Omit<StockEntry, 'id' | 'created_at'> & {
+    _history?: {
+      old_quantity: number;
+      old_boxes:    number;
+      move_type:    'recepcion' | 'inventario';
+      changed_at:   string;
+    };
+  },
+): Promise<void> {
+  const hist = entry._history;
+
+  const { error } = await supabase.rpc('upsert_stock_with_history', {
+    p_product_id:   entry.product_id,
+    p_depot_id:     entry.depot_id,
+    p_lot_number:   entry.lot_number,
+    p_quantity:     entry.quantity,
+    p_boxes:        entry.boxes ?? 0,
+    p_expiry_date:  entry.expiry_date ?? null,
+    p_notes:        entry.notes ?? null,
+    // Para lotes nuevos, estos tres van null → la función no inserta historial
+    p_old_quantity: hist?.old_quantity ?? null,
+    p_old_boxes:    hist?.old_boxes    ?? null,
+    p_move_type:    hist?.move_type    ?? null,
+    p_changed_at:   hist?.changed_at   ?? new Date().toISOString(),
+  });
+
+  if (error) throw error;
+}
+
+// ── Categories ────────────────────────────────────────────────
+
+export async function fetchCategories(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('name')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => r.name);
+}
+
+export async function upsertCategory(name: string): Promise<void> {
+  const { error } = await supabase
+    .from('categories')
+    .upsert({ name: name.trim() }, { onConflict: 'name' });
+  if (error) throw error;
+}
+
+export async function deleteCategory(name: string): Promise<void> {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('name', name);
+  if (error) throw error;
+}
+
+// ── Sub-depósitos ─────────────────────────────────────────────
+
+export async function fetchSubDepots(): Promise<SubDepot[]> {
+  const { data, error } = await supabase.from('sub_depots').select('*').order('name');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createSubDepot(depotId: number, name: string): Promise<SubDepot> {
+  const { data, error } = await supabase
+    .from('sub_depots')
+    .insert({ depot_id: depotId, name: name.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function assignProductsToSubDepot(
+  productIds: number[],
+  subDepotId: number | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('products')
+    .update({ sub_depot_id: subDepotId })
+    .in('id', productIds);
+  if (error) throw error;
+}
+
+// ── Notas / Tareas de marca ───────────────────────────────────
+
+export async function fetchBrandNotes(): Promise<BrandNoteRemote[]> {
+  const { data, error } = await supabase
+    .from('brand_notes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function upsertBrandNote(
+  note: Omit<BrandNoteRemote, 'id' | 'created_at' | 'updated_at'> & { id?: number },
+): Promise<BrandNoteRemote> {
+  const { id, ...rest } = note;
+  if (id) {
+    const { data, error } = await supabase
+      .from('brand_notes')
+      .update(rest)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('brand_notes')
+    .insert(rest)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteBrandNoteRemote(id: number): Promise<void> {
+  const { error } = await supabase.from('brand_notes').delete().eq('id', id);
   if (error) throw error;
 }
 

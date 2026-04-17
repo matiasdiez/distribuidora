@@ -7,10 +7,10 @@
  * La comparación es case-insensitive (no importa mayúsculas/minúsculas).
  */
 const AUTHORIZED_EMAILS: string[] = [
-  // Agregar emails autorizados, por ejemplo:
-  // 'gerente@miempresa.com',
-  // 'empleado@gmail.com',
-  "matiasdiez@gmail.com",
+  'por ejemplo:
+  // gerente@miempresa.com',
+  'matiasdiez@gmail.com',
+  'matiasluisdiez@gmail.com',
 ];
 
 export default AUTHORIZED_EMAILS;

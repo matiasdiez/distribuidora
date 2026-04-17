@@ -12,11 +12,15 @@ import {
   saveProducts, saveStockEntries, saveDepots,
   setMeta, getMeta, isInitialized,
   getPendingSync, clearPendingSync,
+  saveSubDepots, saveBrandNotesFromRemote, updateBrandNote,
 } from './idb';
 
 import {
   fetchAllProducts, fetchStockByDepot, fetchDepots,
-  upsertStockEntry,
+  upsertStockEntry, upsertStockWithHistory,
+  fetchSubDepots, fetchBrandNotes,
+  upsertBrandNote, deleteBrandNoteRemote,
+  assignProductsToSubDepot, createSubDepot,
 } from './supabase';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';
@@ -56,13 +60,21 @@ export async function initialSync(depotId: number = 1, force = false): Promise<v
   emit('syncing', 'Descargando productos...');
 
   try {
-    const [products, depots] = await Promise.all([fetchAllProducts(), fetchDepots()]);
+    const [products, depots, subDepots, brandNotes] = await Promise.all([
+      fetchAllProducts(), fetchDepots(), fetchSubDepots(), fetchBrandNotes(),
+    ]);
     await saveDepots(depots);
+    await saveSubDepots(subDepots);
     await saveProducts(products);
 
     emit('syncing', 'Descargando stock...');
     const stock = await fetchStockByDepot(depotId);
     await saveStockEntries(stock);
+
+    // Guardar notas remotas localmente (merge: priorizar remoto)
+    await saveBrandNotesFromRemote(
+      brandNotes.map(n => ({ ...n, remote_id: n.id }))
+    );
 
     await setMeta('initialized', 'true');
     await setMeta('last_sync', new Date().toISOString());
@@ -91,7 +103,14 @@ export async function syncPending(): Promise<void> {
   for (const item of pending) {
     try {
       if (item.type === 'stock_upsert') {
-        await upsertStockEntry(item.payload);
+        // Si el payload lleva _history, usar la RPC atómica que guarda
+        // stock_entries + stock_history en una sola transacción.
+        // Si no (lote nuevo), usar el upsert simple.
+        if ((item.payload as any)._history) {
+          await upsertStockWithHistory(item.payload as any);
+        } else {
+          await upsertStockEntry(item.payload);
+        }
         if (item.id) synced.push(item.id);
       } else if (item.type === 'depot_assignment') {
         const { assignProductsToDepot } = await import('./supabase');
@@ -104,6 +123,39 @@ export async function syncPending(): Promise<void> {
         const depots = await getDepots();
         const updated = depots.map(d => d.id === item.payload.temp_id ? { ...d, id: newDepot.id } : d);
         await saveDepots(updated);
+        if (item.id) synced.push(item.id);
+
+      } else if (item.type === 'brand_note_upsert') {
+        const p = item.payload;
+        const remote = await upsertBrandNote({
+          id:       p.remote_id,
+          brand:    p.brand,
+          content:  p.content,
+          status:   p.status,
+          priority: p.priority,
+          due_date: p.due_date,
+        });
+        // Guardar el remote_id asignado por Supabase en el registro local
+        if (p.id) await updateBrandNote(p.id, { remote_id: remote.id });
+        if (item.id) synced.push(item.id);
+
+      } else if (item.type === 'brand_note_delete') {
+        await deleteBrandNoteRemote(item.payload.remote_id);
+        if (item.id) synced.push(item.id);
+
+      } else if (item.type === 'sub_depot_create') {
+        const newSub = await createSubDepot(item.payload.depot_id, item.payload.name);
+        const { saveSubDepots, getSubDepots } = await import('./idb');
+        const subs = await getSubDepots();
+        const updated = subs.map(s => s.id === item.payload.temp_id ? { ...s, id: newSub.id } : s);
+        await saveSubDepots(updated);
+        if (item.id) synced.push(item.id);
+
+      } else if (item.type === 'product_sub_depot_assign') {
+        await assignProductsToSubDepot(
+          item.payload.product_ids,
+          item.payload.sub_depot_id,
+        );
         if (item.id) synced.push(item.id);
       }
     } catch (err) {
