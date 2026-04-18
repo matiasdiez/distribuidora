@@ -4,7 +4,7 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 7; // v7: sub_depots + brand_notes
+const DB_VERSION = 8; // v8: fix brand_notes duplication
 
 export type PendingSync =
   | {
@@ -178,6 +178,13 @@ export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
           const bn = db.createObjectStore("brand_notes", { keyPath: "id", autoIncrement: true });
           bn.createIndex("by_brand",  "brand");
           bn.createIndex("by_status", "status");
+        }
+      }
+      if (oldVersion < 8) {
+        // v8: limpiar brand_notes para forzar re-descarga sin duplicados.
+        // La próxima sync descarga todas las notas correctamente.
+        if (db.objectStoreNames.contains("brand_notes")) {
+          transaction.objectStore("brand_notes").clear();
         }
       }
     },
@@ -623,8 +630,30 @@ export async function getAllBrandNotes(): Promise<BrandNote[]> {
 
 export async function saveBrandNotesFromRemote(notes: BrandNote[]): Promise<void> {
   const db = await getDB();
+
+  // Leer todas las notas locales una vez para construir índice por remote_id
+  const locals = await db.getAll("brand_notes");
+  const localByRemoteId = new Map<number, number>(); // remote_id → local id
+  for (const l of locals) {
+    if (l.remote_id != null) localByRemoteId.set(l.remote_id, l.id!);
+  }
+
   const tx = db.transaction("brand_notes", "readwrite");
-  await Promise.all([...notes.map((n) => tx.store.put(n)), tx.done]);
+
+  for (const remote of notes) {
+    const remoteId = remote.id as unknown as number; // Supabase id
+
+    if (localByRemoteId.has(remoteId)) {
+      // Ya existe localmente con otro id autoincrement → actualizar ese registro
+      const localId = localByRemoteId.get(remoteId)!;
+      tx.store.put({ ...remote, id: localId, remote_id: remoteId });
+    } else {
+      // No existe localmente → insertar usando el id de Supabase como clave
+      tx.store.put({ ...remote, remote_id: remoteId });
+    }
+  }
+
+  await tx.done;
 }
 
 export async function isInitialized(): Promise<boolean> {
