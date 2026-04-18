@@ -33,11 +33,11 @@
     <span class="nav-label">Tareas</span>
   </a>
 
-  <a href="/ajustes" class="nav-item" class:active={activePage === 'settings'}
-    aria-label="Ajustes" aria-current={activePage === 'settings' ? 'page' : undefined}>
+  <button class="nav-item" class:active={activePage === 'settings'}
+    on:click={() => dispatch('settings')} aria-label="Ajustes" type="button">
     <span class="nav-icon"><Settings size={22} strokeWidth={2} /></span>
     <span class="nav-label">Ajustes</span>
-  </a>
+  </button>
 
 </nav>
 

@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import Tareas from './Tareas.svelte';
   import BottomNav from './BottomNav.svelte';
+  import SettingsSheet from './SettingsSheet.svelte';
   import { initTheme } from '../lib/themeStore';
 
+  let showSettings = false;
   onMount(() => { initTheme(); });
 </script>
 
@@ -11,7 +13,16 @@
   <div class="page-content">
     <Tareas />
   </div>
-  <BottomNav activePage="tareas" />
+  <BottomNav activePage="tareas" on:settings={() => (showSettings = true)} />
+  <SettingsSheet
+    open={showSettings}
+    products={[]}
+    depotId={1}
+    categoryLabel="Todos"
+    depots={[]}
+    activeDepot={null}
+    on:close={() => (showSettings = false)}
+  />
 </div>
 
 <style>

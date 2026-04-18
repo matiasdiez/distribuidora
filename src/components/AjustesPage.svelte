@@ -6,6 +6,7 @@
   } from 'lucide-svelte';
   import Skeleton from './Skeleton.svelte';
   import BottomNav from './BottomNav.svelte';
+  import SettingsSheet from './SettingsSheet.svelte';
   import { initTheme } from '../lib/themeStore';
   import { getDepots, getSubDepots, saveSubDepots } from '../lib/idb';
   import {
@@ -16,6 +17,7 @@
   import type { SubDepot } from '../lib/idb';
 
   // ── Secciones ────────────────────────────────────────────────
+  let showSettings = false;
   type Section = 'home' | 'categories' | 'subdepots';
   let section: Section = 'home';
 
@@ -320,7 +322,16 @@
 
   </div>
 
-  <BottomNav activePage="settings" on:settings={() => {}} />
+  <BottomNav activePage="settings" on:settings={() => (showSettings = true)} />
+  <SettingsSheet
+    open={showSettings}
+    products={[]}
+    depotId={1}
+    categoryLabel="Todos"
+    depots={[]}
+    activeDepot={null}
+    on:close={() => (showSettings = false)}
+  />
 </div>
 
 <style>

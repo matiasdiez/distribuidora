@@ -3,19 +3,40 @@
   import {
     Store, Tag, Pencil, Plus, Check, X, ChevronLeft,
     AlertCircle, Clock, Calendar, Flag, ArrowRight,
-    StickyNote, PackageSearch,
+    StickyNote, PackageSearch, Search, Hexagon,
   } from 'lucide-svelte';
   import StockModal from './StockModal.svelte';
   import SkeletonBrandRow from './SkeletonBrandRow.svelte';
   import {
     searchProducts, getStockByProduct,
     getBrandNotes, saveBrandNote, updateBrandNote, deleteBrandNote,
-    getDepots,
+    getDepots, getSubDepots,
   } from '../lib/idb';
-  import type { Product } from '../lib/supabase';
+  import type { Product, Depot } from '../lib/supabase';
   import type { BrandNote } from '../lib/idb';
 
   export let depotId: number = 1;
+
+  // ── Filtros de la lista de marcas ───────────────────────────
+  let searchQuery   = '';          // búsqueda instantánea por nombre de marca
+  let depots: Depot[] = [];
+  let activeDepotId: number | 'all' = 'all';
+
+  // Lista filtrada reactivamente
+  $: filteredBrands = brands.filter(b => {
+    const matchesSearch = !searchQuery ||
+      b.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDepot  = activeDepotId === 'all';
+    // Depot filter: filter brands that have at least one product in depot
+    // (handled by reloading brands when depot changes)
+    return matchesSearch && matchesDepot;
+  });
+
+  $: if (activeDepotId !== 'all') {
+    loadBrandsForDepot(typeof activeDepotId === 'number' ? activeDepotId : undefined);
+  } else if (activeDepotId === 'all') {
+    loadBrandsForDepot(undefined);
+  }
 
   // ── Estado ───────────────────────────────────────────────────
   type BrandRow = {
@@ -50,13 +71,20 @@
   let deleteConfirm: number | null = null;
 
   onMount(async () => {
+    depots = await getDepots();
     await loadBrands();
   });
 
   // ── Carga de marcas ──────────────────────────────────────────
-  async function loadBrands() {
+  async function loadBrandsForDepot(dId?: number) {
+    // Avoid double-load on initial mount (loadBrands handles it)
+    if (!brands.length) return;
+    await loadBrands(dId);
+  }
+
+  async function loadBrands(filterDepotId?: number) {
     loading = true;
-    const all = await searchProducts('');
+    const all = await searchProducts('', undefined, filterDepotId);
     const notes = await getBrandNotes();
     const now = Date.now();
 
@@ -220,13 +248,56 @@
       <span class="header-title"><Store size={16} strokeWidth={2} /> Marcas</span>
     </div>
 
+    <!-- Búsqueda instantánea -->
+    <div class="marcas-search-wrap">
+      <span class="marcas-search-icon"><Search size={16} strokeWidth={2} /></span>
+      <input
+        class="marcas-search-input"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        placeholder="Buscar marca..."
+        bind:value={searchQuery}
+      />
+      {#if searchQuery}
+        <button class="marcas-search-clear" on:click={() => (searchQuery = '')} aria-label="Limpiar">
+          <X size={13} strokeWidth={2.5} />
+        </button>
+      {/if}
+    </div>
+
+    <!-- Selector de depósito (solo si hay más de uno) -->
+    {#if depots.length > 1}
+      <div class="depot-filter">
+        <button
+          class="depot-pill"
+          class:active={activeDepotId === 'all'}
+          on:click={() => (activeDepotId = 'all')}
+        >
+          <Hexagon size={11} strokeWidth={2} /> Todos
+        </button>
+        {#each depots as d}
+          <button
+            class="depot-pill"
+            class:active={activeDepotId === d.id}
+            on:click={() => (activeDepotId = d.id)}
+          >{d.name}</button>
+        {/each}
+      </div>
+    {/if}
+
     {#if loading}
       <div class="brand-list"><SkeletonBrandRow count={10} /></div>
-    {:else if brands.length === 0}
-      <div class="empty-state"><PackageSearch size={36} strokeWidth={1.5} />Sin productos</div>
+    {:else if filteredBrands.length === 0}
+      <div class="empty-state">
+        <PackageSearch size={36} strokeWidth={1.5} />
+        {searchQuery ? \`Sin marcas para "\${searchQuery}"\` : 'Sin productos'}
+      </div>
     {:else}
       <div class="brand-list">
-        {#each brands as b}
+        {#each filteredBrands as b}
           <button class="brand-row" on:click={() => openBrand(b.name)}>
             <span class="freshness-dot {b.freshnessClass}" title={b.freshnessLabel}></span>
             <span class="brand-name">{b.name}</span>
@@ -506,4 +577,50 @@
   .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px 20px; color: var(--text-lo); font-family: var(--font-mono); font-size: 12px; }
 
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* ── Búsqueda y filtros de marcas ───────────────────────────── */
+  .marcas-search-wrap {
+    position: relative; display: flex; align-items: center;
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    border-radius: 8px; margin-bottom: 8px;
+    transition: border-color 0.15s;
+  }
+  .marcas-search-wrap:focus-within { border-color: var(--amber); }
+  .marcas-search-icon {
+    position: absolute; left: 12px;
+    color: var(--text-lo); pointer-events: none;
+    display: flex; align-items: center;
+  }
+  .marcas-search-input {
+    flex: 1; height: 44px; padding: 0 40px 0 36px;
+    background: transparent; border: none; outline: none;
+    color: var(--text-hi); font-family: var(--font-ui); font-size: 15px;
+  }
+  .marcas-search-input::placeholder { color: var(--text-lo); }
+  .marcas-search-input::-webkit-search-cancel-button { display: none; }
+  .marcas-search-clear {
+    position: absolute; right: 0; width: 44px; height: 44px;
+    background: none; border: none; color: var(--text-mid);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
+  .depot-filter {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding-bottom: 2px; margin-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .depot-filter::-webkit-scrollbar { display: none; }
+  .depot-pill {
+    flex-shrink: 0; height: 30px; padding: 0 12px; border-radius: 15px;
+    border: 1.5px solid var(--border); background: var(--bg-card);
+    color: var(--text-mid); font-family: var(--font-mono); font-size: 11px;
+    font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .depot-pill.active {
+    border-color: var(--amber); color: var(--amber); background: #1a1200;
+  }
 </style>

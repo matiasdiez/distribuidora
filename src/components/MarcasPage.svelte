@@ -2,10 +2,12 @@
   import { onMount } from 'svelte';
   import Marcas from './Marcas.svelte';
   import BottomNav from './BottomNav.svelte';
+  import SettingsSheet from './SettingsSheet.svelte';
   import { loadSavedDepot } from '../lib/depotStore';
   import { initTheme } from '../lib/themeStore';
 
   let depotId = 1;
+  let showSettings = false;
 
   onMount(() => {
     initTheme();
@@ -18,7 +20,16 @@
   <div class="page-content">
     <Marcas {depotId} />
   </div>
-  <BottomNav activePage="marcas" />
+  <BottomNav activePage="marcas" on:settings={() => (showSettings = true)} />
+  <SettingsSheet
+    open={showSettings}
+    products={[]}
+    {depotId}
+    categoryLabel="Todos"
+    depots={[]}
+    activeDepot={null}
+    on:close={() => (showSettings = false)}
+  />
 </div>
 
 <style>
