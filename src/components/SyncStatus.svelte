@@ -1,40 +1,32 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Clock, Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-svelte';
+  import { Clock, AlertTriangle, RefreshCw } from 'lucide-svelte';
   import { onSyncStatus, type SyncStatus } from '../lib/sync';
-  import { getPendingSync } from '../lib/idb';
+  import { getPendingSync, getDeadLetters } from '../lib/idb';
 
   let status: SyncStatus = 'idle';
-  let message = '';
+  let message      = '';
   let pendingCount = 0;
-  let visible = false;
+  let deadCount    = 0;
+  let visible      = false;
   let hideTimer: ReturnType<typeof setTimeout>;
-
-  // Unsub del listener de sync
   let unsub: () => void;
 
   onMount(async () => {
     status = navigator.onLine ? 'idle' : 'offline';
-
-    // Chequear pendientes al iniciar
-    const pending = await getPendingSync();
-    pendingCount = pending.length;
+    await refreshCounts();
 
     unsub = onSyncStatus(async (s, msg) => {
-      status = s;
+      status  = s;
       message = msg ?? '';
+      await refreshCounts();
 
-      // Actualizar pendientes
-      const p = await getPendingSync();
-      pendingCount = p.length;
-
-      // Mostrar notificación breve si es success o error
       if (s === 'success' || s === 'error') {
         visible = true;
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => {
           visible = false;
-          status = navigator.onLine ? 'idle' : 'offline';
+          status  = navigator.onLine ? 'idle' : 'offline';
         }, 3000);
       } else {
         visible = true;
@@ -42,88 +34,68 @@
     });
   });
 
-  onDestroy(() => {
-    unsub?.();
-    clearTimeout(hideTimer);
-  });
+  onDestroy(() => { unsub?.(); clearTimeout(hideTimer); });
 
-  // Color y texto del indicador según estado
+  async function refreshCounts() {
+    const [p, d] = await Promise.all([getPendingSync(), getDeadLetters()]);
+    pendingCount = p.length;
+    deadCount    = d.length;
+  }
+
   $: dot = {
-    idle:    { color: '#555',        label: 'Online'           },
-    syncing: { color: '#f5a623',     label: 'Sincronizando...' },
-    success: { color: '#4ade80',     label: message || 'Sync OK' },
-    error:   { color: '#f87171',     label: message || 'Error sync' },
-    offline: { color: '#f87171',     label: 'Sin conexión'     },
+    idle:    { color: '#555',    label: 'Online'           },
+    syncing: { color: '#f5a623', label: 'Sincronizando...' },
+    success: { color: '#4ade80', label: message || 'Sync OK' },
+    error:   { color: '#f87171', label: message || 'Error sync' },
+    offline: { color: '#f87171', label: 'Sin conexión'     },
   }[status];
 
-  // Badge de pendientes
   $: hasPending = pendingCount > 0;
+  $: hasDead    = deadCount > 0;
 </script>
 
 <div class="sync-bar" class:is-offline={status === 'offline'}>
-  <!-- Indicador de estado -->
   <div class="sync-dot-wrap">
-    <span class="sync-dot" style="background:{dot.color}; {status === 'syncing' ? 'animation: pulse 1s infinite;' : ''}"></span>
+    <span class="sync-dot" style="background:{dot.color};
+      {status === 'syncing' ? 'animation: pulse 1s infinite;' : ''}">
+    </span>
     <span class="sync-label">{dot.label}</span>
   </div>
 
-  <!-- Badge pendientes -->
+  <!-- Cambios pendientes (normales) -->
   {#if hasPending}
     <span class="pending-badge" title="{pendingCount} cambio(s) pendientes de sync">
-      <span class="pending-icon"><Clock size={11} strokeWidth={2.5} /></span>{pendingCount}
+      <Clock size={11} strokeWidth={2.5} />{pendingCount}
+    </span>
+  {/if}
+
+  <!-- Dead letters — errores permanentes que necesitan atención -->
+  {#if hasDead}
+    <span class="dead-badge" title="{deadCount} cambio(s) no pudieron sincronizarse — ver Ajustes">
+      <AlertTriangle size={11} strokeWidth={2.5} />{deadCount}
     </span>
   {/if}
 </div>
 
 <style>
-  .sync-bar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 0;
-  }
-
-  .sync-dot-wrap {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .sync-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: background 0.3s;
-  }
-
-  .sync-label {
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    color: var(--text-mid, #a0a0a0);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .is-offline .sync-label {
-    color: #f87171;
-  }
+  .sync-bar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .sync-dot-wrap { display: flex; align-items: center; gap: 5px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background 0.3s; }
+  .sync-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-mid); letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; }
+  .is-offline .sync-label { color: #f87171; }
 
   .pending-badge {
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    color: #f5a623;
-    background: #2a1e00;
-    padding: 2px 6px;
-    border-radius: 3px;
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--amber); background: #2a1e00;
+    padding: 2px 6px; border-radius: 3px;
   }
-
-  .pending-icon { display: inline-flex; align-items: center; margin-right: 3px; }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.3; }
+  .dead-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--red, #f87171); background: #2a0a0a;
+    padding: 2px 6px; border-radius: 3px;
+    animation: pulse 2s ease-in-out infinite;
   }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 </style>

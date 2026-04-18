@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Hexagon, Settings, X, Check, ChevronRight, Loader2, Download, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-svelte';
+  import { Hexagon, Settings, X, Check, ChevronRight, Loader2, Download, RefreshCw, AlertTriangle, ExternalLink, Trash2 } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import ExportCSV  from './ExportCSV.svelte';
   import { theme, toggleTheme } from '../lib/themeStore';
   import { setActiveDepot, getAutoEnter, setAutoEnter } from '../lib/depotStore';
-  import { saveDepots } from '../lib/idb';
+  import { saveDepots, getDeadLetters, clearDeadLetters, deleteDeadLetter } from '../lib/idb';
+  import type { DeadLetter } from '../lib/idb';
   import { createDepot } from '../lib/supabase';
   import type { Product, Depot } from '../lib/supabase';
 
@@ -21,6 +22,26 @@
     depotsUpdated: Depot[];
     forceSync:     void;
   }>();
+
+  // ── Dead letters ─────────────────────────────────────────────
+  let deadLetters: DeadLetter[] = [];
+  let dlExpanded                = false;
+
+  async function loadDeadLetters() {
+    deadLetters = await getDeadLetters();
+  }
+
+  async function dismissDeadLetter(id: number) {
+    await deleteDeadLetter(id);
+    deadLetters = deadLetters.filter(d => d.id !== id);
+  }
+
+  async function clearAllDeadLetters() {
+    await clearDeadLetters();
+    deadLetters = [];
+  }
+
+  $: if (open) loadDeadLetters();
 
   // ── Sync forzado ─────────────────────────────────────────────
   let syncing     = false;
@@ -268,7 +289,62 @@
         <p class="sync-hint">Sube cambios locales y descarga la base de datos completa.</p>
       </section>
 
+      {#if false}
       <!-- TEMPORALMENTE OCULTO — pendiente rediseño de categorías -->
+      <div class="divider"></div>
+
+      <section class="section">
+        <p class="section-label">Categorías</p>
+
+        {#if catLoading}
+          <div class="cat-loading"><Loader2 size={16} class="spin" /> Cargando...</div>
+        {:else}
+          <div class="cat-list">
+            {#each categories as cat}
+              <div class="cat-row">
+                <span class="cat-name">{cat}</span>
+                <button
+                  class="cat-delete"
+                  class:confirming={catDeleteConfirm === cat}
+                  on:click={() => handleDeleteCategory(cat)}
+                  title={catDeleteConfirm === cat ? 'Tocá de nuevo para confirmar' : 'Eliminar categoría'}
+                >
+                  {#if catDeleteConfirm === cat}
+                    <AlertTriangle size={13} strokeWidth={2.5} /> Confirmar
+                  {:else}
+                    <X size={13} strokeWidth={2.5} />
+                  {/if}
+                </button>
+              </div>
+            {/each}
+            {#if categories.length === 0}
+              <p class="cat-empty">Sin categorías personalizadas.</p>
+            {/if}
+          </div>
+
+          <div class="cat-add-row">
+            <input
+              class="input-field cat-input"
+              type="text"
+              placeholder="Nueva categoría..."
+              bind:value={newCatName}
+              on:keydown={(e) => e.key === 'Enter' && handleAddCategory()}
+              autocomplete="off"
+            />
+            <button
+              class="cat-add-btn"
+              on:click={handleAddCategory}
+              disabled={catSaving || !newCatName.trim()}
+            >
+              {#if catSaving}<Loader2 size={14} class="spin" />{:else}<Check size={14} strokeWidth={3} />{/if}
+            </button>
+          </div>
+          {#if catError}<p class="cat-error">{catError}</p>{/if}
+        {/if}
+      </section>
+
+      <div class="divider"></div>
+      {/if}
 
       <div class="divider"></div>
 
@@ -646,6 +722,20 @@
   :global(.spin) { animation: spin 1s linear infinite; }
   @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 
+
+  /* Dead letters */
+  .dl-header { display: flex; align-items: center; justify-content: space-between; }
+  .dl-toggle { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); cursor: pointer; }
+  .dl-desc { font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); line-height: 1.4; }
+  .dl-list { display: flex; flex-direction: column; gap: 4px; }
+  .dl-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: #1a0808; border: 1px solid var(--red, #f87171); border-radius: 6px; }
+  .dl-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .dl-type { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--red, #f87171); }
+  .dl-error { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dl-date { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); }
+  .dl-dismiss { flex-shrink: 0; width: 30px; height: 30px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .dl-dismiss:hover { border-color: var(--red); color: var(--red); }
+  .dl-clear-all { width: 100%; height: 36px; border-radius: 6px; border: 1.5px solid var(--red, #f87171); background: #2a0a0a; color: var(--red, #f87171); font-family: var(--font-mono); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; }
 
   .sync-row          { transition: border-color 0.15s, color 0.15s; }
   :global(.spin) { animation: spin 1s linear infinite; }

@@ -8,7 +8,7 @@
   import BottomNav from './BottomNav.svelte';
   import SettingsSheet from './SettingsSheet.svelte';
   import { initTheme } from '../lib/themeStore';
-  import { getDepots, getSubDepots, saveSubDepots } from '../lib/idb';
+  import { getDepots, getSubDepots, saveSubDepots, saveCategories, getCategoriesLocal } from '../lib/idb';
   import {
     fetchCategories, upsertCategory, deleteCategory,
     fetchSubDepots, createSubDepot,
@@ -31,9 +31,15 @@
 
   async function loadCategories() {
     catLoading = true; catError = '';
-    try { categories = await fetchCategories(); }
-    catch { catError = 'No se pudieron cargar las categorías.'; }
-    finally { catLoading = false; }
+    try {
+      categories = await fetchCategories();
+      // Guardar en IndexedDB para uso offline
+      await saveCategories(categories);
+    } catch {
+      // Si falla la red, usar caché local
+      categories = await getCategoriesLocal();
+      if (categories.length === 0) catError = 'No se pudieron cargar las categorías.';
+    } finally { catLoading = false; }
   }
 
   async function handleAddCat() {
@@ -43,7 +49,7 @@
     try {
       await upsertCategory(name);
       newCatName = '';
-      await loadCategories();
+      await loadCategories(); // también actualiza IndexedDB dentro
     } catch { catError = 'Error al guardar.'; }
     finally { catSaving = false; }
   }

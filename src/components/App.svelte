@@ -47,6 +47,10 @@
   let showExpiring = false;
   let expiringLots: Awaited<ReturnType<typeof getExpiringLots>> = [];
 
+  // SW update
+  let swUpdateAvailable = false;
+  let swRegistration: ServiceWorkerRegistration | null = null;
+
   // Auth
   let session: Session | null = null;
   let authChecked = false;
@@ -89,11 +93,35 @@
     await bootApp();
   });
 
+  function activateUpdate() {
+    // Pedirle al SW en espera que active inmediatamente
+    swRegistration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+    swUpdateAvailable = false;
+    window.location.reload();
+  }
+
   async function bootApp() {
     cleanupListeners = initConnectivityListeners();
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(console.error);
+      const reg = await navigator.serviceWorker.register("/sw.js").catch(console.error);
+      if (reg) {
+        swRegistration = reg;
+        // Detectar SW esperando activación (nueva versión descargada)
+        if (reg.waiting) swUpdateAvailable = true;
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker?.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              swUpdateAvailable = true;
+            }
+          });
+        });
+      }
+      // El SW activo nos avisa cuando una nueva versión tomó el control
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data?.type === 'SW_UPDATED') swUpdateAvailable = true;
+      });
     }
 
     depot = getAutoEnter() ? loadSavedDepot() : null;
@@ -179,6 +207,14 @@
 
 <!-- ── App principal ──────────────────────────────────────────────── -->
 {:else}
+  <!-- Banner: nueva versión de la app disponible -->
+  {#if swUpdateAvailable}
+    <div class="sw-update-banner">
+      <span>🆕 Nueva versión disponible</span>
+      <button class="sw-update-btn" on:click={activateUpdate}>Actualizar</button>
+    </div>
+  {/if}
+
   <!-- Banner aviso sync matutina no realizada -->
   {#if showSyncWarning}
     <div class="sync-warning-banner">
@@ -340,6 +376,23 @@
     font-family: var(--font-mono, monospace);
     font-size: 12px; font-weight: 700;
     gap: 12px;
+  }
+  .sw-update-banner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: #0d1a2a;
+    border-bottom: 1px solid #1e3a5a;
+    color: #60a5fa;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px; font-weight: 700;
+    gap: 12px;
+  }
+  .sw-update-btn {
+    flex-shrink: 0; height: 28px; padding: 0 14px;
+    border-radius: 14px; border: 1px solid #1e3a5a;
+    background: #1a3050; color: #60a5fa;
+    font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   .sync-warning-close {
     flex-shrink: 0; width: 26px; height: 26px;

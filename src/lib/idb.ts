@@ -4,7 +4,7 @@ import type { Product, StockEntry, Depot } from "./supabase";
 // ── Schema de IndexedDB ───────────────────────────────────────
 
 const DB_NAME = "deposito-db";
-const DB_VERSION = 8; // v8: fix brand_notes duplication
+const DB_VERSION = 9; // v9: categories local + dead_letters queue
 
 export type PendingSync =
   | {
@@ -73,6 +73,15 @@ export type PendingSync =
     };
 
 export type MoveType = 'recepcion' | 'inventario';
+
+export interface DeadLetter {
+  id?:          number;
+  item:         PendingSync;   // el item original que falló
+  fail_count:   number;        // cuántas veces falló
+  last_error:   string;        // último mensaje de error
+  first_failed: string;        // ISO timestamp del primer fallo
+  last_failed:  string;        // ISO timestamp del último fallo
+}
 export type NoteStatus   = 'open' | 'done';
 export type NotePriority = 'low'  | 'normal' | 'high';
 
@@ -131,6 +140,8 @@ interface DepostioDB {
     value: BrandNote;
     indexes: { by_brand: string; by_status: string };
   };
+  categories: { key: string; value: { name: string } };
+  dead_letters: { key: number; value: DeadLetter };
   pending_sync: { key: number; value: PendingSync };
   meta: { key: string; value: { key: string; value: string } };
 }
@@ -181,10 +192,17 @@ export async function getDB(): Promise<IDBPDatabase<DepostioDB>> {
         }
       }
       if (oldVersion < 8) {
-        // v8: limpiar brand_notes para forzar re-descarga sin duplicados.
-        // La próxima sync descarga todas las notas correctamente.
         if (db.objectStoreNames.contains("brand_notes")) {
           transaction.objectStore("brand_notes").clear();
+        }
+      }
+      if (oldVersion < 9) {
+        // v9: caché local de categorías + cola de mensajes fallidos
+        if (!db.objectStoreNames.contains("categories")) {
+          db.createObjectStore("categories", { keyPath: "name" });
+        }
+        if (!db.objectStoreNames.contains("dead_letters")) {
+          db.createObjectStore("dead_letters", { keyPath: "id", autoIncrement: true });
         }
       }
     },
@@ -654,6 +672,55 @@ export async function saveBrandNotesFromRemote(notes: BrandNote[]): Promise<void
   }
 
   await tx.done;
+}
+
+// ── Categorías (caché local) ─────────────────────────────────
+
+export async function saveCategories(names: string[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("categories", "readwrite");
+  await tx.store.clear();
+  await Promise.all([...names.map(name => tx.store.put({ name })), tx.done]);
+}
+
+export async function getCategoriesLocal(): Promise<string[]> {
+  const db = await getDB();
+  const rows = await db.getAll("categories");
+  return rows.map(r => r.name).sort();
+}
+
+// ── Dead letters (sync fallida permanentemente) ───────────────
+
+export async function addDeadLetter(
+  item: PendingSync,
+  failCount: number,
+  error: string,
+  firstFailed: string,
+): Promise<void> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  await db.add("dead_letters", {
+    item,
+    fail_count:   failCount,
+    last_error:   error,
+    first_failed: firstFailed,
+    last_failed:  now,
+  });
+}
+
+export async function getDeadLetters(): Promise<DeadLetter[]> {
+  const db = await getDB();
+  return db.getAll("dead_letters");
+}
+
+export async function clearDeadLetters(): Promise<void> {
+  const db = await getDB();
+  await db.clear("dead_letters");
+}
+
+export async function deleteDeadLetter(id: number): Promise<void> {
+  const db = await getDB();
+  await db.delete("dead_letters", id);
 }
 
 export async function isInitialized(): Promise<boolean> {

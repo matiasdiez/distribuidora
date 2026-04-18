@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Search, X, Tag } from 'lucide-svelte';
-  import { searchProducts, getCategories, getBrands } from "../lib/idb";
+  import { searchProducts, getCategoriesLocal, getBrands } from "../lib/idb";
   import type { Product } from "../lib/supabase";
 
   export let onResults: (products: Product[]) => void = () => {};
@@ -43,7 +43,7 @@
   }
 
   onMount(async () => {
-    [categories, allBrands] = await Promise.all([getCategories(), getBrands()]);
+    [categories, allBrands] = await Promise.all([getCategoriesLocal(), getBrands()]);
     // Trigger búsqueda inicial (mostrar todo)
     await runSearch();
   });

@@ -13,6 +13,7 @@ import {
   setMeta, getMeta, isInitialized,
   getPendingSync, clearPendingSync,
   saveSubDepots, saveBrandNotesFromRemote, updateBrandNote,
+  saveCategories, addDeadLetter, getDeadLetters,
 } from './idb';
 
 import {
@@ -21,6 +22,7 @@ import {
   fetchSubDepots, fetchBrandNotes,
   upsertBrandNote, deleteBrandNoteRemote,
   assignProductsToSubDepot, createSubDepot,
+  fetchCategories,
 } from './supabase';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';
@@ -60,12 +62,14 @@ export async function initialSync(depotId: number = 1, force = false): Promise<v
   emit('syncing', 'Descargando productos...');
 
   try {
-    const [products, depots, subDepots, brandNotes] = await Promise.all([
-      fetchAllProducts(), fetchDepots(), fetchSubDepots(), fetchBrandNotes(),
+    const [products, depots, subDepots, brandNotes, categoryNames] = await Promise.all([
+      fetchAllProducts(), fetchDepots(), fetchSubDepots(),
+      fetchBrandNotes(), fetchCategories(),
     ]);
     await saveDepots(depots);
     await saveSubDepots(subDepots);
     await saveProducts(products);
+    await saveCategories(categoryNames);
 
     emit('syncing', 'Descargando stock...');
     const stock = await fetchStockByDepot(depotId);
@@ -91,6 +95,13 @@ export async function initialSync(depotId: number = 1, force = false): Promise<v
 
 // ── Sync de cambios pendientes ────────────────────────────────
 
+// Máximo de intentos antes de mover un item a dead_letters
+const MAX_FAIL_COUNT = 3;
+
+// Contador de fallos en memoria (se resetea al reiniciar la app)
+// key = item.id, value = { count, firstFailed }
+const failCounts = new Map<number, { count: number; firstFailed: string }>();
+
 export async function syncPending(): Promise<void> {
   if (!navigator.onLine) return;
 
@@ -99,6 +110,7 @@ export async function syncPending(): Promise<void> {
 
   emit('syncing', `Sincronizando ${pending.length} cambio(s)...`);
   const synced: number[] = [];
+  const deadIds: number[] = [];
 
   for (const item of pending) {
     try {
@@ -165,16 +177,38 @@ export async function syncPending(): Promise<void> {
         );
         if (item.id) synced.push(item.id);
       }
-    } catch (err) {
-      console.error('[sync] failed to sync item:', item, err);
+    } catch (err: any) {
+      const id = item.id!;
+      const errMsg = err?.message ?? String(err);
+      console.error('[sync] failed to sync item:', item, errMsg);
+
+      const existing = failCounts.get(id) ?? {
+        count: 0,
+        firstFailed: new Date().toISOString(),
+      };
+      const newCount = existing.count + 1;
+      failCounts.set(id, { count: newCount, firstFailed: existing.firstFailed });
+
+      if (newCount >= MAX_FAIL_COUNT) {
+        // Mover a dead_letters y sacar de pending_sync
+        await addDeadLetter(item, newCount, errMsg, existing.firstFailed);
+        deadIds.push(id);
+        failCounts.delete(id);
+        console.warn(`[sync] item ${id} movido a dead_letters después de ${newCount} intentos`);
+      }
     }
   }
 
-  if (synced.length > 0) await clearPendingSync(synced);
+  const toRemove = [...synced, ...deadIds];
+  if (toRemove.length > 0) await clearPendingSync(toRemove);
 
-  const remaining = pending.length - synced.length;
-  if (remaining === 0) {
+  const deadLetters = await getDeadLetters();
+  const remaining   = pending.length - synced.length - deadIds.length;
+
+  if (remaining === 0 && deadLetters.length === 0) {
     emit('success', 'Todo sincronizado ✓');
+  } else if (deadLetters.length > 0) {
+    emit('error', `${deadLetters.length} cambio(s) no pudieron sincronizarse`);
   } else {
     emit('error', `${remaining} cambio(s) no sincronizados`);
   }
