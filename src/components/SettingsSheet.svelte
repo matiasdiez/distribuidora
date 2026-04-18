@@ -289,62 +289,7 @@
         <p class="sync-hint">Sube cambios locales y descarga la base de datos completa.</p>
       </section>
 
-      {#if false}
-      <!-- TEMPORALMENTE OCULTO — pendiente rediseño de categorías -->
-      <div class="divider"></div>
 
-      <section class="section">
-        <p class="section-label">Categorías</p>
-
-        {#if catLoading}
-          <div class="cat-loading"><Loader2 size={16} class="spin" /> Cargando...</div>
-        {:else}
-          <div class="cat-list">
-            {#each categories as cat}
-              <div class="cat-row">
-                <span class="cat-name">{cat}</span>
-                <button
-                  class="cat-delete"
-                  class:confirming={catDeleteConfirm === cat}
-                  on:click={() => handleDeleteCategory(cat)}
-                  title={catDeleteConfirm === cat ? 'Tocá de nuevo para confirmar' : 'Eliminar categoría'}
-                >
-                  {#if catDeleteConfirm === cat}
-                    <AlertTriangle size={13} strokeWidth={2.5} /> Confirmar
-                  {:else}
-                    <X size={13} strokeWidth={2.5} />
-                  {/if}
-                </button>
-              </div>
-            {/each}
-            {#if categories.length === 0}
-              <p class="cat-empty">Sin categorías personalizadas.</p>
-            {/if}
-          </div>
-
-          <div class="cat-add-row">
-            <input
-              class="input-field cat-input"
-              type="text"
-              placeholder="Nueva categoría..."
-              bind:value={newCatName}
-              on:keydown={(e) => e.key === 'Enter' && handleAddCategory()}
-              autocomplete="off"
-            />
-            <button
-              class="cat-add-btn"
-              on:click={handleAddCategory}
-              disabled={catSaving || !newCatName.trim()}
-            >
-              {#if catSaving}<Loader2 size={14} class="spin" />{:else}<Check size={14} strokeWidth={3} />{/if}
-            </button>
-          </div>
-          {#if catError}<p class="cat-error">{catError}</p>{/if}
-        {/if}
-      </section>
-
-      <div class="divider"></div>
-      {/if}
 
       <div class="divider"></div>
 
