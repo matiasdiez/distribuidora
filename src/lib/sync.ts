@@ -107,7 +107,14 @@ export async function syncPending(): Promise<void> {
         // stock_entries + stock_history en una sola transacción.
         // Si no (lote nuevo), usar el upsert simple.
         if ((item.payload as any)._history) {
-          await upsertStockWithHistory(item.payload as any);
+          try {
+            await upsertStockWithHistory(item.payload as any);
+          } catch (rpcErr) {
+            // Fallback: si la función RPC no existe aún (migración SQL pendiente),
+            // usar el upsert simple para no dejar el item atascado en la cola.
+            console.warn('[sync] upsertStockWithHistory falló, usando fallback:', rpcErr);
+            await upsertStockEntry(item.payload);
+          }
         } else {
           await upsertStockEntry(item.payload);
         }
