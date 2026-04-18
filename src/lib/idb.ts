@@ -255,6 +255,12 @@ export async function assignProductsToDepotLocal(
   await tx.done;
 }
 
+export async function getBrands(): Promise<string[]> {
+  const db = await getDB();
+  const products = await db.getAll("products");
+  return [...new Set(products.map((p) => p.brand))].sort();
+}
+
 export async function getCategories(): Promise<string[]> {
   const db = await getDB();
   const products = await db.getAll("products");

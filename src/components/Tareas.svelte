@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import SkeletonTaskCard from './SkeletonTaskCard.svelte';
   import {
     ClipboardList, Check, X, Pencil, Flag, Calendar,
     AlertCircle, Filter, Store, StickyNote,
@@ -151,7 +152,7 @@
   </div>
 
   {#if loading}
-    <div class="empty-state">Cargando tareas...</div>
+    <div class="task-list"><SkeletonTaskCard count={8} /></div>
   {:else if filtered.length === 0}
     <div class="empty-state">
       <StickyNote size={36} strokeWidth={1.5} />

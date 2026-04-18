@@ -6,6 +6,7 @@
     StickyNote, PackageSearch,
   } from 'lucide-svelte';
   import StockModal from './StockModal.svelte';
+  import SkeletonBrandRow from './SkeletonBrandRow.svelte';
   import {
     searchProducts, getStockByProduct,
     getBrandNotes, saveBrandNote, updateBrandNote, deleteBrandNote,
@@ -220,7 +221,7 @@
     </div>
 
     {#if loading}
-      <div class="empty-state">Cargando marcas...</div>
+      <div class="brand-list"><SkeletonBrandRow count={10} /></div>
     {:else if brands.length === 0}
       <div class="empty-state"><PackageSearch size={36} strokeWidth={1.5} />Sin productos</div>
     {:else}

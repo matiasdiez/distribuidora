@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Hexagon, Settings, X, Check, ChevronRight, Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-svelte';
+  import { Hexagon, Settings, X, Check, ChevronRight, Loader2, Download, RefreshCw, AlertTriangle, ExternalLink } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import ExportCSV  from './ExportCSV.svelte';
   import { theme, toggleTheme } from '../lib/themeStore';
   import { setActiveDepot, getAutoEnter, setAutoEnter } from '../lib/depotStore';
   import { saveDepots } from '../lib/idb';
-  import { createDepot, fetchCategories, upsertCategory, deleteCategory } from '../lib/supabase';
+  import { createDepot } from '../lib/supabase';
   import type { Product, Depot } from '../lib/supabase';
 
   export let open      = false;
@@ -21,59 +21,6 @@
     depotsUpdated: Depot[];
     forceSync:     void;
   }>();
-
-  // ── Categorías ────────────────────────────────────────────────
-  let categories: string[]     = [];
-  let catLoading               = false;
-  let catError                 = '';
-  let newCatName               = '';
-  let catSaving                = false;
-  let catDeleteConfirm: string | null = null; // nombre a confirmar borrado
-
-  async function loadCategories() {
-    catLoading = true;
-    catError   = '';
-    try {
-      categories = await fetchCategories();
-    } catch (e) {
-      catError = 'No se pudieron cargar las categorías.';
-    } finally {
-      catLoading = false;
-    }
-  }
-
-  async function handleAddCategory() {
-    const name = newCatName.trim();
-    if (!name) return;
-    catSaving = true;
-    catError  = '';
-    try {
-      await upsertCategory(name);
-      newCatName = '';
-      await loadCategories();
-    } catch (e) {
-      catError = 'Error al guardar la categoría.';
-    } finally {
-      catSaving = false;
-    }
-  }
-
-  async function handleDeleteCategory(name: string) {
-    if (catDeleteConfirm !== name) {
-      catDeleteConfirm = name; // primer tap: pedir confirmación
-      return;
-    }
-    catDeleteConfirm = null;
-    try {
-      await deleteCategory(name);
-      await loadCategories();
-    } catch (e) {
-      catError = 'Error al eliminar la categoría.';
-    }
-  }
-
-  // Cargar categorías cuando se abre el sheet
-  $: if (open) loadCategories();
 
   // ── Sync forzado ─────────────────────────────────────────────
   let syncing     = false;
@@ -389,7 +336,12 @@
           <span class="action-label">Clasificar productos</span>
         </a>
 
-        <a href="/settings" class="action-row" style="margin-bottom: 12px; text-decoration: none; color: inherit;">
+        <a href="/ajustes" class="action-row" style="text-decoration: none; color: inherit;" on:click={close}>
+          <span class="action-icon"><ExternalLink size={16} strokeWidth={2} /></span>
+          <span class="action-label">Categorías y sub-depósitos</span>
+          <span class="action-badge" style="font-size:10px">→</span>
+        </a>
+        <a href="/settings" class="action-row" style="text-decoration: none; color: inherit;">
           <span class="action-icon"><Settings size={16} strokeWidth={2} /></span>
           <span class="action-label">Umbrales de stock</span>
         </a>
@@ -748,21 +700,7 @@
 
   :global(.spin) { animation: spin 1s linear infinite; }
   @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  /* Categorías */
-  .cat-loading { font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); display: flex; align-items: center; gap: 6px; padding: 4px 0; }
-  .cat-list    { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-  .cat-row     { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
-  .cat-name    { font-family: var(--font-mono); font-size: 12px; color: var(--text-hi); }
-  .cat-delete  { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: none; color: var(--text-lo); font-family: var(--font-mono); font-size: 10px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, color 0.15s; }
-  .cat-delete:hover, .cat-delete:active { border-color: var(--red, #f87171); color: var(--red, #f87171); }
-  .cat-delete.confirming { border-color: var(--red, #f87171); color: var(--red, #f87171); background: #2a0a0a; }
-  .cat-empty   { font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); padding: 4px 2px; }
-  .cat-add-row { display: flex; gap: 8px; align-items: center; }
-  .cat-input   { flex: 1; height: 40px; font-size: 14px; }
-  .cat-add-btn { flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px; border: 1.5px solid var(--amber-dim, #b57a1a); background: #1a1200; color: var(--amber); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s; }
-  .cat-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .cat-add-btn:not(:disabled):active { background: #2a1e00; }
-  .cat-error   { font-family: var(--font-mono); font-size: 11px; color: var(--red, #f87171); padding: 4px 2px; }
+
 
   .sync-row          { transition: border-color 0.15s, color 0.15s; }
   :global(.spin) { animation: spin 1s linear infinite; }

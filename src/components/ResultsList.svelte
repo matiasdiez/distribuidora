@@ -8,6 +8,8 @@
     type FreshnessThresholds,
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
+  import SkeletonProductCard from "./SkeletonProductCard.svelte";
+  import SkeletonProductCard from "./SkeletonProductCard.svelte";
   import type { Product } from "../lib/supabase";
 
   export let products: Product[] = [];
@@ -131,11 +133,11 @@
 
 <div class="results">
   {#if isLoading}
-    <div class="empty-state">
-      <span class="empty-icon"
-        ><Loader2 size={28} strokeWidth={1.5} class="spin-icon" /></span
-      >
-      <span>Buscando...</span>
+    <div class="results-header">
+      <span class="results-count">Buscando...</span>
+    </div>
+    <div class="product-list">
+      <SkeletonProductCard count={6} />
     </div>
   {:else if products.length === 0 && query.length > 0}
     <div class="empty-state">
