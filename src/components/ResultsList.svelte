@@ -9,7 +9,6 @@
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
   import SkeletonProductCard from "./SkeletonProductCard.svelte";
-  import SkeletonProductCard from "./SkeletonProductCard.svelte";
   import type { Product } from "../lib/supabase";
 
   export let products: Product[] = [];
