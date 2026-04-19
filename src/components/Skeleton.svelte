@@ -28,9 +28,9 @@
   .skeleton {
     background: linear-gradient(
       90deg,
-      var(--skeleton-base, #1e1e1e) 0%,
-      var(--skeleton-shine, #2a2a2a) 40%,
-      var(--skeleton-base, #1e1e1e) 80%
+      var(--skeleton-base) 0%,
+      var(--skeleton-shine) 40%,
+      var(--skeleton-base) 80%
     );
     background-size: 200% 100%;
     animation: skeleton-pulse 1.6s ease-in-out infinite;
