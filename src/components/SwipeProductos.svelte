@@ -11,7 +11,14 @@
   } from "../lib/freshness";
   import { loadSavedDepot } from "../lib/depotStore";
   import { initTheme } from "../lib/themeStore";
-  import { Hexagon, ArrowLeft, ArrowRight, Search, X, Loader2 } from "lucide-svelte";
+  import {
+    Hexagon,
+    ArrowLeft,
+    ArrowRight,
+    Search,
+    X,
+    Loader2,
+  } from "lucide-svelte";
   import SwipeCard from "./SwipeCard.svelte";
   import SyncStatus from "./SyncStatus.svelte";
   import FreshnessDot from "./FreshnessDot.svelte";
@@ -114,8 +121,8 @@
     rebuildBrands();
   }
 
-  let brandSearch    = "";
-  let subDepots: SubDepot[]         = [];
+  let brandSearch = "";
+  let subDepots: SubDepot[] = [];
   let activeSubDepotId: number | null | undefined = undefined;
 
   function rebuildBrands() {
@@ -150,18 +157,20 @@
   } // recompute brands when mode changes
 
   function selectBrand(brand: string) {
-    selectedBrand    = brand;
-    currentIndex     = 0;
-    dragX            = 0;
+    selectedBrand = brand;
+    currentIndex = 0;
+    dragX = 0;
     activeSubDepotId = undefined;
-    subDepots        = [];            // reset while loading
+    subDepots = []; // reset while loading
 
     // Mostrar productos INMEDIATAMENTE, sin esperar sub-depósitos
     applyProductFilter();
 
     // Cargar sub-depósitos en background (no bloquea la vista)
     if (!catalogMode) {
-      getSubDepots(depotId).then(sds => { subDepots = sds; });
+      getSubDepots(depotId).then((sds) => {
+        subDepots = sds;
+      });
     }
   }
 
@@ -174,13 +183,14 @@
       ? source
       : source.filter((p) => p.depot_id === depotId);
     const byBrand = byDepot.filter((p) => p.brand === selectedBrand);
-    products = activeSubDepotId === undefined
-      ? byBrand
-      : byBrand.filter((p) =>
-          activeSubDepotId === null
-            ? (p as any).sub_depot_id == null
-            : (p as any).sub_depot_id === activeSubDepotId
-        );
+    products =
+      activeSubDepotId === undefined
+        ? byBrand
+        : byBrand.filter((p) =>
+            activeSubDepotId === null
+              ? (p as any).sub_depot_id == null
+              : (p as any).sub_depot_id === activeSubDepotId,
+          );
     currentIndex = 0;
   }
 
@@ -340,7 +350,9 @@
   <header class="app-header">
     <div class="header-left">
       {#if selectedBrand}
-        <button class="back-btn" on:click={clearBrand} aria-label="Volver"><ArrowLeft size={18} strokeWidth={2} /></button>
+        <button class="back-btn" on:click={clearBrand} aria-label="Volver"
+          ><ArrowLeft size={18} strokeWidth={2} /></button
+        >
         <span class="header-brand">{selectedBrand}</span>
       {:else}
         <div class="header-brand-context">
@@ -378,7 +390,9 @@
           <button
             class="search-clear"
             on:click={() => (brandSearch = "")}
-            aria-label="Limpiar búsqueda"><X size={12} strokeWidth={2.5} /></button>
+            aria-label="Limpiar búsqueda"
+            ><X size={12} strokeWidth={2.5} /></button
+          >
         {/if}
       </div>
 
@@ -401,14 +415,14 @@
       </div>
 
       <!-- Filtro de categoría: "Todos" fijo + resto scrolleable -->
-      <div class="cat-pills-wrap">
+      <div class="cat-pills-wrap cat-pills">
         <button
           class="cat-pill cat-pill-all"
           class:active={selectedCategory === "Todos"}
-          on:click={() => selectCategory("Todos")}
-        >Todos</button>
+          on:click={() => selectCategory("Todos")}>Todos</button
+        >
         <div class="cat-pills-scroll">
-          {#each categories.filter(c => c !== "Todos") as cat}
+          {#each categories.filter((c) => c !== "Todos") as cat}
             <button
               class="cat-pill"
               class:active={selectedCategory === cat}
@@ -458,24 +472,37 @@
   {:else}
     <!-- ── Vista swipe ───────────────────────────────────────────────────── -->
     <div class="swipe-wrap">
-
       <!-- Filtro sub-depósito (solo si el depósito tiene sectores) -->
       {#if subDepots.length > 0}
         <div class="sd-filter-bar">
-          <span class="sd-filter-label"><Layers size={11} strokeWidth={2} /> Sector</span>
+          <span class="sd-filter-label"
+            ><Layers size={11} strokeWidth={2} /> Sector</span
+          >
           <button
-            class="sd-pill" class:active={activeSubDepotId === undefined}
-            on:click={() => { activeSubDepotId = undefined; applyProductFilter(); }}
-          >Todos</button>
+            class="sd-pill"
+            class:active={activeSubDepotId === undefined}
+            on:click={() => {
+              activeSubDepotId = undefined;
+              applyProductFilter();
+            }}>Todos</button
+          >
           <button
-            class="sd-pill" class:active={activeSubDepotId === null}
-            on:click={() => { activeSubDepotId = null; applyProductFilter(); }}
-          >Sin sector</button>
+            class="sd-pill"
+            class:active={activeSubDepotId === null}
+            on:click={() => {
+              activeSubDepotId = null;
+              applyProductFilter();
+            }}>Sin sector</button
+          >
           {#each subDepots as sd}
             <button
-              class="sd-pill" class:active={activeSubDepotId === sd.id}
-              on:click={() => { activeSubDepotId = sd.id; applyProductFilter(); }}
-            >{sd.name}</button>
+              class="sd-pill"
+              class:active={activeSubDepotId === sd.id}
+              on:click={() => {
+                activeSubDepotId = sd.id;
+                applyProductFilter();
+              }}>{sd.name}</button
+            >
           {/each}
         </div>
       {/if}
@@ -519,7 +546,9 @@
           class:disabled={currentIndex === 0}
           on:click={goPrev}
           disabled={currentIndex === 0 || isAnimating}
-          aria-label="Producto anterior"><ArrowLeft size={20} strokeWidth={2} /></button>
+          aria-label="Producto anterior"
+          ><ArrowLeft size={20} strokeWidth={2} /></button
+        >
 
         <span
           class="nav-dots"
@@ -547,7 +576,9 @@
           class:disabled={currentIndex === products.length - 1}
           on:click={goNext}
           disabled={currentIndex === products.length - 1 || isAnimating}
-          aria-label="Producto siguiente"><ArrowRight size={20} strokeWidth={2} /></button>
+          aria-label="Producto siguiente"
+          ><ArrowRight size={20} strokeWidth={2} /></button
+        >
       </div>
     </div>
   {/if}
@@ -834,7 +865,9 @@
     scrollbar-width: none;
     flex: 1;
   }
-  .cat-pills-scroll::-webkit-scrollbar { display: none; }
+  .cat-pills-scroll::-webkit-scrollbar {
+    display: none;
+  }
 
   .cat-pill {
     flex-shrink: 0;
@@ -1043,27 +1076,58 @@
     background: var(--amber, #f5a623);
   }
 
-  :global(.spin) { animation: spin 1.2s linear infinite; }
+  :global(.spin) {
+    animation: spin 1.2s linear infinite;
+  }
   .sd-filter-bar {
-    display: flex; align-items: center; gap: 6px;
-    overflow-x: auto; padding: 8px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px 0 4px;
     scrollbar-width: none;
   }
-  .sd-filter-bar::-webkit-scrollbar { display: none; }
+  .sd-filter-bar::-webkit-scrollbar {
+    display: none;
+  }
   .sd-filter-label {
-    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-lo);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-lo);
   }
   .sd-pill {
-    flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 14px;
-    border: 1.5px solid var(--border); background: var(--bg-card);
-    color: var(--text-mid); font-family: var(--font-mono); font-size: 11px;
-    font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    flex-shrink: 0;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-mid);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 0.15s,
+      color 0.15s,
+      background 0.15s;
   }
-  .sd-pill.active { border-color: #60a5fa; color: #60a5fa; background: #0d1a2a; }
-  :global([data-theme="light"]) .sd-pill.active { background: #eff6ff; }
+  .sd-pill.active {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #0d1a2a;
+  }
+  :global([data-theme="light"]) .sd-pill.active {
+    background: #eff6ff;
+  }
 
   @keyframes spin {
     from {
