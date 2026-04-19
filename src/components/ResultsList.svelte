@@ -9,12 +9,28 @@
   } from "../lib/freshness";
   import FreshnessDot from "./FreshnessDot.svelte";
   import SkeletonProductCard from "./SkeletonProductCard.svelte";
+  import { getSubDepots } from "../lib/idb";
+  import type { SubDepot } from "../lib/idb";
   import type { Product } from "../lib/supabase";
 
   export let products: Product[] = [];
   export let isLoading: boolean = false;
   export let depotId: number | "unassigned" | undefined = 1;
   export let query: string = "";
+
+  // Mapa de sub-depósitos para lookup por id
+  let subDepotMap = new Map<number, string>(); // id → name
+
+  $: loadSubDepotMap(depotId);
+
+  async function loadSubDepotMap(dId: typeof depotId) {
+    if (typeof dId !== "number") {
+      subDepotMap = new Map();
+      return;
+    }
+    const sds = await getSubDepots(dId);
+    subDepotMap = new Map(sds.map((s) => [s.id, s.name]));
+  }
   // En modo catálogo, depotId es undefined (sin filtro), pero aún queremos
   // mostrar el botón + Stock usando el depósito activo del parent.
   export let activeDepotId: number | "unassigned" | undefined = undefined;
@@ -228,7 +244,15 @@
             </div>
 
             <div class="product-bottom">
-              <span class="badge badge-blue">{product.category}</span>
+              <div class="badges-row">
+                <span class="badge badge-blue">{product.category}</span>
+                {#if (product as any).sub_depot_id && subDepotMap.has((product as any).sub_depot_id)}
+                  <span class="badge badge-sub">
+                    <Layers size={9} strokeWidth={2} />
+                    {subDepotMap.get((product as any).sub_depot_id)}
+                  </span>
+                {/if}
+              </div>
               {#if typeof stockDepotId === "number"}
                 <button
                   class="add-btn"
@@ -411,6 +435,44 @@
     font-style: italic;
   }
 
+  .badges-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .badge-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #0d1a2a;
+    color: #60a5fa;
+    border: 1px solid #1e3a5a;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+  }
+  .badges-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .badge-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #0d1a2a;
+    color: #60a5fa;
+    border: 1px solid #1e3a5a;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+  }
   :global(mark) {
     background: #2a1e00;
     color: var(--amber, #f5a623);

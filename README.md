@@ -31,6 +31,7 @@ cp .env.example .env
 ### 3. Crear tablas en Supabase
 
 En tu proyecto Supabase → **SQL Editor** → pegá y ejecutá el contenido de:
+
 ```
 supabase/schema.sql
 ```
@@ -103,4 +104,4 @@ supabase/
 
 1. **Primera vez con WiFi**: la app descarga todos los productos y stock → IndexedDB
 2. **Uso diario sin internet**: búsquedas y actualizaciones van a IndexedDB
-3. **Cuando volvé el WiFi**: sync automática silenciosa de cambios pendientes
+3. **Cuando vuelve el WiFi**: sync automática silenciosa de cambios pendientes

@@ -18,6 +18,7 @@
   import BottomNav from "./BottomNav.svelte";
   import SettingsSheet from "./SettingsSheet.svelte";
   import type { Product, Depot } from "../lib/supabase";
+  import type { SubDepot } from "../lib/idb";
 
   export let depotId: number = 1;
 
@@ -113,7 +114,9 @@
     rebuildBrands();
   }
 
-  let brandSearch = "";
+  let brandSearch    = "";
+  let subDepots: SubDepot[]         = [];
+  let activeSubDepotId: number | null | undefined = undefined;
 
   function rebuildBrands() {
     const catSource =
@@ -146,19 +149,40 @@
     rebuildBrands();
   } // recompute brands when mode changes
 
-  function selectBrand(brand: string) {
+  async function selectBrand(brand: string) {
     selectedBrand = brand;
     currentIndex = 0;
     dragX = 0;
+    activeSubDepotId = undefined;
+
+    // Cargar sub-depósitos del depósito activo para esta marca
+    if (!catalogMode) {
+      subDepots = await getSubDepots(depotId);
+    } else {
+      subDepots = [];
+    }
+
+    applyProductFilter();
+  }
+
+  function applyProductFilter() {
     const source =
       selectedCategory === "Todos"
         ? allProducts
         : allProducts.filter((p) => p.category === selectedCategory);
-    // En modo catálogo mostramos todos; en modo depósito filtramos
     const byDepot = catalogMode
       ? source
       : source.filter((p) => p.depot_id === depotId);
-    products = byDepot.filter((p) => p.brand === brand);
+    const byBrand = byDepot.filter((p) => p.brand === selectedBrand);
+    // Filtro sub-depósito
+    products = activeSubDepotId === undefined
+      ? byBrand
+      : byBrand.filter((p) =>
+          activeSubDepotId === null
+            ? (p as any).sub_depot_id == null
+            : (p as any).sub_depot_id === activeSubDepotId
+        );
+    currentIndex = 0;
   }
 
   function toggleCatalog() {
@@ -428,6 +452,28 @@
   {:else}
     <!-- ── Vista swipe ───────────────────────────────────────────────────── -->
     <div class="swipe-wrap">
+
+      <!-- Filtro sub-depósito (solo si el depósito tiene sectores) -->
+      {#if subDepots.length > 0}
+        <div class="sd-filter-bar">
+          <span class="sd-filter-label"><Layers size={11} strokeWidth={2} /> Sector</span>
+          <button
+            class="sd-pill" class:active={activeSubDepotId === undefined}
+            on:click={() => { activeSubDepotId = undefined; applyProductFilter(); }}
+          >Todos</button>
+          <button
+            class="sd-pill" class:active={activeSubDepotId === null}
+            on:click={() => { activeSubDepotId = null; applyProductFilter(); }}
+          >Sin sector</button>
+          {#each subDepots as sd}
+            <button
+              class="sd-pill" class:active={activeSubDepotId === sd.id}
+              on:click={() => { activeSubDepotId = sd.id; applyProductFilter(); }}
+            >{sd.name}</button>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Barra de progreso -->
       <div class="progress-bar">
         <div
@@ -964,6 +1010,26 @@
   }
 
   :global(.spin) { animation: spin 1.2s linear infinite; }
+  .sd-filter-bar {
+    display: flex; align-items: center; gap: 6px;
+    overflow-x: auto; padding: 8px 0 4px;
+    scrollbar-width: none;
+  }
+  .sd-filter-bar::-webkit-scrollbar { display: none; }
+  .sd-filter-label {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-lo);
+  }
+  .sd-pill {
+    flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 14px;
+    border: 1.5px solid var(--border); background: var(--bg-card);
+    color: var(--text-mid); font-family: var(--font-mono); font-size: 11px;
+    font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .sd-pill.active { border-color: #60a5fa; color: #60a5fa; background: #0d1a2a; }
+
   @keyframes spin {
     from {
       transform: rotate(0deg);

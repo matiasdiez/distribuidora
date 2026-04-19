@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Search, X, Tag } from 'lucide-svelte';
-  import { searchProducts, getCategoriesLocal, getBrands } from "../lib/idb";
+  import { Search, X, Tag, Layers } from 'lucide-svelte';
+  import { searchProducts, getCategoriesLocal, getBrands, getSubDepots } from "../lib/idb";
+  import type { SubDepot } from "../lib/idb";
   import type { Product } from "../lib/supabase";
 
   export let onResults: (products: Product[]) => void = () => {};
@@ -9,6 +10,10 @@
   export let isLoading: boolean = false;
   export let depotId: number | "unassigned" | undefined = 1;
   export let query = "";
+
+  // Sub-depósito activo (undefined = sin filtro, null = sin asignar, number = específico)
+  let subDepots: SubDepot[]    = [];
+  let activeSubDepotId: number | null | undefined = undefined;
 
   let categories: string[]  = [];
   let allBrands: string[]   = [];
@@ -44,14 +49,26 @@
 
   onMount(async () => {
     [categories, allBrands] = await Promise.all([getCategoriesLocal(), getBrands()]);
-    // Trigger búsqueda inicial (mostrar todo)
+    await loadSubDepots();
     await runSearch();
   });
+
+  async function loadSubDepots() {
+    if (typeof depotId === 'number') {
+      subDepots = await getSubDepots(depotId);
+    } else {
+      subDepots = [];
+    }
+    activeSubDepotId = undefined;
+  }
+
+  // Recargar sub-depósitos si cambia el depósito activo
+  $: if (depotId) loadSubDepots();
 
   async function runSearch() {
     isLoading = true;
     const cat = activeCategory === "Todos" ? undefined : activeCategory;
-    const results = await searchProducts(effectiveQuery, cat, depotId);
+    const results = await searchProducts(effectiveQuery, cat, depotId, activeSubDepotId);
     onResults(results);
     isLoading = false;
   }
@@ -183,6 +200,30 @@
           class:active={activeCategory === cat}
           on:click={() => selectCategory(cat)}
         >{cat}</button>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- ── Filtros de sub-depósito (solo si hay sub-depósitos cargados) ── -->
+  {#if subDepots.length > 0}
+    <div class="filters sd-filters" role="group" aria-label="Filtrar por sub-depósito">
+      <span class="sd-label"><Layers size={11} strokeWidth={2} /> Sector</span>
+      <button
+        class="filter-pill sd-pill"
+        class:active={activeSubDepotId === undefined}
+        on:click={() => { activeSubDepotId = undefined; runSearch(); }}
+      >Todos</button>
+      <button
+        class="filter-pill sd-pill"
+        class:active={activeSubDepotId === null}
+        on:click={() => { activeSubDepotId = null; runSearch(); }}
+      >Sin sector</button>
+      {#each subDepots as sd}
+        <button
+          class="filter-pill sd-pill"
+          class:active={activeSubDepotId === sd.id}
+          on:click={() => { activeSubDepotId = sd.id; runSearch(); }}
+        >{sd.name}</button>
       {/each}
     </div>
   {/if}
@@ -338,4 +379,12 @@
     from { transform: translateY(-6px); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
   }
+
+  .sd-filters { gap: 5px; }
+  .sd-label {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-lo);
+  }
+  .sd-pill { height: 28px; padding: 0 10px; font-size: 12px; }
 </style>
