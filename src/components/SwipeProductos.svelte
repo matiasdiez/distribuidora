@@ -149,20 +149,20 @@
     rebuildBrands();
   } // recompute brands when mode changes
 
-  async function selectBrand(brand: string) {
-    selectedBrand = brand;
-    currentIndex = 0;
-    dragX = 0;
+  function selectBrand(brand: string) {
+    selectedBrand    = brand;
+    currentIndex     = 0;
+    dragX            = 0;
     activeSubDepotId = undefined;
+    subDepots        = [];            // reset while loading
 
-    // Cargar sub-depósitos del depósito activo para esta marca
-    if (!catalogMode) {
-      subDepots = await getSubDepots(depotId);
-    } else {
-      subDepots = [];
-    }
-
+    // Mostrar productos INMEDIATAMENTE, sin esperar sub-depósitos
     applyProductFilter();
+
+    // Cargar sub-depósitos en background (no bloquea la vista)
+    if (!catalogMode) {
+      getSubDepots(depotId).then(sds => { subDepots = sds; });
+    }
   }
 
   function applyProductFilter() {
@@ -174,7 +174,6 @@
       ? source
       : source.filter((p) => p.depot_id === depotId);
     const byBrand = byDepot.filter((p) => p.brand === selectedBrand);
-    // Filtro sub-depósito
     products = activeSubDepotId === undefined
       ? byBrand
       : byBrand.filter((p) =>
@@ -401,15 +400,22 @@
         >
       </div>
 
-      <!-- Filtro de categoría -->
-      <div class="cat-pills">
-        {#each categories as cat}
-          <button
-            class="cat-pill"
-            class:active={selectedCategory === cat}
-            on:click={() => selectCategory(cat)}>{cat}</button
-          >
-        {/each}
+      <!-- Filtro de categoría: "Todos" fijo + resto scrolleable -->
+      <div class="cat-pills-wrap">
+        <button
+          class="cat-pill cat-pill-all"
+          class:active={selectedCategory === "Todos"}
+          on:click={() => selectCategory("Todos")}
+        >Todos</button>
+        <div class="cat-pills-scroll">
+          {#each categories.filter(c => c !== "Todos") as cat}
+            <button
+              class="cat-pill"
+              class:active={selectedCategory === cat}
+              on:click={() => selectCategory(cat)}>{cat}</button
+            >
+          {/each}
+        </div>
       </div>
 
       <p class="selector-label">
@@ -803,6 +809,33 @@
     display: none;
   }
 
+  .cat-pills-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow: hidden;
+  }
+  .cat-pill-all {
+    flex-shrink: 0;
+    border-right: none;
+    border-radius: 20px 0 0 20px;
+    border-right: 1px solid var(--border);
+    z-index: 1;
+    background: var(--bg-card);
+  }
+  .cat-pill-all.active {
+    border-color: var(--amber);
+  }
+  .cat-pills-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 0 12px;
+    scrollbar-width: none;
+    flex: 1;
+  }
+  .cat-pills-scroll::-webkit-scrollbar { display: none; }
+
   .cat-pill {
     flex-shrink: 0;
     height: 32px;
@@ -904,6 +937,7 @@
     flex-direction: column;
     overflow: hidden;
     padding: 10px 0 0;
+    min-height: 0; /* critical for flex children to shrink correctly */
   }
 
   /* Barra de progreso */
@@ -1029,6 +1063,7 @@
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
   .sd-pill.active { border-color: #60a5fa; color: #60a5fa; background: #0d1a2a; }
+  :global([data-theme="light"]) .sd-pill.active { background: #eff6ff; }
 
   @keyframes spin {
     from {
