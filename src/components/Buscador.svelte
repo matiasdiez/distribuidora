@@ -6,8 +6,8 @@
   import type { SubDepot } from "../lib/idb";
 
   export let onResults: (products: Product[]) => void = () => {};
+  export let onSearchStart: () => void = () => {};  // notifica al padre que empezó una búsqueda
   export let onCategoryChange: (cat: string) => void = () => {};
-  export let isLoading: boolean = false;
   export let depotId: number | "unassigned" | undefined = 1;
   export let query = "";
 
@@ -57,13 +57,14 @@
   });
 
   async function runSearch() {
-    isLoading = true;
+    onSearchStart();                              // padre pone isLoading = true
     try {
       const cat     = activeCategory === "Todos" ? undefined : activeCategory;
       const results = await searchProducts(effectiveQuery, cat, depotId, activeSubDepotId);
-      onResults(results);
-    } finally {
-      isLoading = false;
+      onResults(results);                         // padre pone isLoading = false
+    } catch (err) {
+      console.error('[buscador] runSearch error:', err);
+      onResults([]);                              // asegurar que el padre limpie el estado
     }
   }
 
