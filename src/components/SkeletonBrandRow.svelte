@@ -27,7 +27,7 @@
   }
   .skel-dot {
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    background: var(--skeleton-base);
+    background: var(--border, #2a2a2a);
   }
   .skel-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

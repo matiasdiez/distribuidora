@@ -222,7 +222,6 @@ export async function searchProducts(
   query: string,
   category?: string,
   depotId?: number | "unassigned" | "all",
-  subDepotId?: number | null,
 ): Promise<Product[]> {
   const db = await getDB();
   const lowerQ = query.toLowerCase().trim();
@@ -241,15 +240,6 @@ export async function searchProducts(
 
   if (typeof depotId !== "undefined" && category && category !== "Todos") {
     products = products.filter((p) => p.category === category);
-  }
-
-  // Filtro de sub-depósito (null = sin asignar, number = sub-depósito específico)
-  if (subDepotId !== undefined) {
-    products = products.filter((p) =>
-      subDepotId === null
-        ? (p as any).sub_depot_id == null
-        : (p as any).sub_depot_id === subDepotId
-    );
   }
 
   if (!lowerQ) return products;

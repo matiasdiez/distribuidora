@@ -33,7 +33,7 @@
     border-radius: var(--radius, 6px);
     overflow: hidden;
   }
-  .skel-bar { width: 4px; flex-shrink: 0; background: var(--skeleton-base); }
+  .skel-bar { width: 4px; flex-shrink: 0; background: var(--border, #2a2a2a); }
   .skel-body { flex: 1; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
   .skel-top { display: flex; align-items: flex-start; justify-content: space-between; }
   .skel-meta { display: flex; align-items: center; gap: 8px; }

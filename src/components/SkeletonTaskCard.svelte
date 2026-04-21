@@ -21,6 +21,6 @@
   }
   .skel-check {
     width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0;
-    background: var(--skeleton-base);
+    background: var(--border, #2a2a2a);
   }
 </style>

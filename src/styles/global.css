@@ -26,10 +26,6 @@
   --text-mid:   #a0a0a0;
   --text-lo:    #555;
 
-  --skeleton-base:   #1e1e1e;
-  --skeleton-shine:  #2a2a2a;
-  --mark-bg:         #2a1e00;
-
   --font-ui:    'Inter', sans-serif;
   --font-mono:  'IBM Plex Mono', monospace;
 
@@ -43,27 +39,23 @@
 /* ── Variables — Light Theme ───────────────────────────────── */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg:              #f5f0e8;
-    --bg-card:         #ffffff;
-    --bg-input:        #faf7f2;
-    --border:          #d8d0c4;
-    --border-hi:       #b8ae9f;
+    --bg:         #f5f0e8;
+    --bg-card:    #ffffff;
+    --bg-input:   #faf7f2;
+    --border:     #d8d0c4;
+    --border-hi:  #b8ae9f;
 
-    --amber:           #c97d10;
-    --amber-dim:       #e8a020;
-    --green:           #16a34a;
-    --green-dim:       #dcfce7;
-    --red:             #dc2626;
-    --red-dim:         #fee2e2;
-    --blue:            #2563eb;
+    --amber:      #c97d10;
+    --amber-dim:  #e8a020;
+    --green:      #16a34a;
+    --green-dim:  #dcfce7;
+    --red:        #dc2626;
+    --red-dim:    #fee2e2;
+    --blue:       #2563eb;
 
-    --text-hi:         #1a1510;
-    --text-mid:        #5a5045;
-    --text-lo:         #9a8f82;
-
-    --skeleton-base:   #e8e2d8;
-    --skeleton-shine:  #f0ebe3;
-    --mark-bg:         #fef3c7;
+    --text-hi:    #1a1510;
+    --text-mid:   #5a5045;
+    --text-lo:    #9a8f82;
 
     color-scheme: light;
   }
@@ -71,27 +63,23 @@
 
 /* Forzar light si data-theme="light" */
 [data-theme="light"] {
-  --bg:              #f5f0e8;
-  --bg-card:         #ffffff;
-  --bg-input:        #faf7f2;
-  --border:          #d8d0c4;
-  --border-hi:       #b8ae9f;
+  --bg:         #f5f0e8;
+  --bg-card:    #ffffff;
+  --bg-input:   #faf7f2;
+  --border:     #d8d0c4;
+  --border-hi:  #b8ae9f;
 
-  --amber:           #c97d10;
-  --amber-dim:       #e8a020;
-  --green:           #16a34a;
-  --green-dim:       #dcfce7;
-  --red:             #dc2626;
-  --red-dim:         #fee2e2;
-  --blue:            #2563eb;
+  --amber:      #c97d10;
+  --amber-dim:  #e8a020;
+  --green:      #16a34a;
+  --green-dim:  #dcfce7;
+  --red:        #dc2626;
+  --red-dim:    #fee2e2;
+  --blue:       #2563eb;
 
-  --text-hi:         #1a1510;
-  --text-mid:        #5a5045;
-  --text-lo:         #9a8f82;
-
-  --skeleton-base:   #e8e2d8;
-  --skeleton-shine:  #f0ebe3;
-  --mark-bg:         #fef3c7;
+  --text-hi:    #1a1510;
+  --text-mid:   #5a5045;
+  --text-lo:    #9a8f82;
 
   color-scheme: light;
 }

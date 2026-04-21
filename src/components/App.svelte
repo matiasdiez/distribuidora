@@ -166,8 +166,7 @@
     expiringCount = expiringLots.length;
   }
 
-  function handleResults(prods: Product[]) { products = prods; isLoading = false; }
-  function handleSearchStart() { isLoading = true; }
+  function handleResults(prods: Product[]) { products = prods; }
   function handleCategoryChange(cat: string) { activeCategory = cat; }
 
   function openModal(e: CustomEvent<{ product: Product }>) {
@@ -266,9 +265,9 @@
 
     <Buscador
       onResults={handleResults}
-      onSearchStart={handleSearchStart}
       onCategoryChange={handleCategoryChange}
       depotId={searchDepot}
+      bind:isLoading
       bind:query={searchQuery}
     />
 
