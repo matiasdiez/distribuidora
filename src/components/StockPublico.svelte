@@ -376,7 +376,7 @@
   .filter-pill.active {
     border-color: var(--amber, #f5a623);
     color: var(--amber, #f5a623);
-    background: #2a1e00;
+    background: var(--amber-bg, #2a1e00);
   }
 
   /* Summary */
@@ -528,9 +528,9 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  :global(.badge-green) { background: #166534; color: #4ade80; }
+  :global(.badge-green) { background: var(--green-dim, #166534); color: var(--green, #4ade80); }
   :global(.badge-red)   { background: #7f1d1d; color: #f87171; }
-  :global(.badge-blue)  { background: #1e2d40; color: #60a5fa; }
+  :global(.badge-blue)  { background: var(--bg-card, #1e2d40); color: var(--blue, #60a5fa); }
 
   @keyframes spin {
     from { transform: rotate(0deg); }

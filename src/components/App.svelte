@@ -9,10 +9,10 @@
   import BottomNav from "./BottomNav.svelte";
   import SettingsSheet from "./SettingsSheet.svelte";
   import Login from "./Login.svelte";
-  import { Hexagon, Loader2, X, AlertTriangle, Bell, BellRing } from 'lucide-svelte';
+  import { Hexagon, Loader2, X, AlertTriangle, Bell, BellRing, Archive, BookOpen, Search } from 'lucide-svelte';
 
   import {
-    isInitialized, countProducts, getDepots, getExpiringLots,
+    isInitialized, countProducts, getDepots, getExpiringLots, confirmNoStock,
   } from "../lib/idb";
   import {
     initialSync, initConnectivityListeners,
@@ -47,6 +47,15 @@
   let showExpiring = false;
   let expiringLots: Awaited<ReturnType<typeof getExpiringLots>> = [];
 
+  // FAB — botón flotante "nueva búsqueda"
+  let showFab = false;
+  let buscadorRef: { focusInput: () => void };
+  function onWindowScroll() { showFab = window.scrollY > 140; }
+  function scrollToSearch() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => buscadorRef?.focusInput(), 320);
+  }
+
   // SW update
   let swUpdateAvailable = false;
   let swRegistration: ServiceWorkerRegistration | null = null;
@@ -64,6 +73,7 @@
 
   onMount(async () => {
     initTheme();
+    if (typeof window !== 'undefined') window.addEventListener('scroll', onWindowScroll, { passive: true });
 
     // ── Auth ──────────────────────────────────────────────────────
     if (!AUTH_DISABLED) {
@@ -159,6 +169,7 @@
   onDestroy(() => {
     cleanupListeners?.();
     cleanupDailySync?.();
+    if (typeof window !== 'undefined') window.removeEventListener('scroll', onWindowScroll);
   });
 
   async function refreshExpiring() {
@@ -181,6 +192,12 @@
     depot = d; setActiveDepot(d); showSettings = false; stockVersion++;
   }
   function handleDepotsUpdated(updated: Depot[]) { depots = updated; }
+
+  async function handleNoStock(e: CustomEvent<{ product: { id: number } }>) {
+    if (typeof depotId !== "number") return;
+    await confirmNoStock(e.detail.product.id, depotId);
+    stockVersion++;
+  }
 </script>
 
 <!-- ── Auth gate ──────────────────────────────────────────────────── -->
@@ -256,14 +273,29 @@
 
   <!-- Contenido principal -->
   <main class="app-main">
-    <div class="scope-pills">
-      <button class="scope-pill" class:active={!catalogMode}
-        on:click={() => { catalogMode = false; stockVersion++; }}>Mi depósito</button>
-      <button class="scope-pill" class:active={catalogMode}
-        on:click={() => { catalogMode = true; stockVersion++; }}>Todo el catálogo</button>
+    <!-- Tab selector animado: Mi depósito / Todo el catálogo -->
+    <div class="tab-rail" class:right={catalogMode}>
+      <div class="tab-slider-bg"></div>
+      <button
+        class="tab-btn"
+        class:tab-active={!catalogMode}
+        on:click={() => { catalogMode = false; stockVersion++; }}
+      >
+        <Archive size={14} strokeWidth={2} />
+        Mi depósito
+      </button>
+      <button
+        class="tab-btn"
+        class:tab-active={catalogMode}
+        on:click={() => { catalogMode = true; stockVersion++; }}
+      >
+        <BookOpen size={14} strokeWidth={2} />
+        Todo el catálogo
+      </button>
     </div>
 
     <Buscador
+      bind:this={buscadorRef}
       onResults={handleResults}
       onCategoryChange={handleCategoryChange}
       depotId={searchDepot}
@@ -279,9 +311,21 @@
         query={searchQuery}
         activeDepotId={depotId}
         on:addStock={openModal}
+        on:noStock={handleNoStock}
       />
     {/key}
   </main>
+
+  <!-- FAB: volver al buscador -->
+  {#if showFab}
+    <button
+      class="fab-search"
+      on:click={scrollToSearch}
+      aria-label="Nueva búsqueda"
+    >
+      <Search size={20} strokeWidth={2.5} />
+    </button>
+  {/if}
 
   <BottomNav activePage="search" on:settings={() => (showSettings = true)} />
 
@@ -380,7 +424,7 @@
   .sw-update-banner {
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 16px;
-    background: #0d1a2a;
+    background: var(--bg-input, #0d1a2a);
     border-bottom: 1px solid #1e3a5a;
     color: #60a5fa;
     font-family: var(--font-mono, monospace);
@@ -390,7 +434,7 @@
   .sw-update-btn {
     flex-shrink: 0; height: 28px; padding: 0 14px;
     border-radius: 14px; border: 1px solid #1e3a5a;
-    background: #1a3050; color: #60a5fa;
+    background: var(--bg-card, #1a3050); color: var(--blue, #60a5fa);
     font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700;
     cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
@@ -409,17 +453,67 @@
   .brand-depot { font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--text-mid); line-height: 1; text-transform: uppercase; letter-spacing: 0.04em; }
   .app-main { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--gap)); }
 
-  /* ── Scope pills ────────────────────────────────────────────── */
-  .scope-pills { display: flex; gap: 6px; padding: 8px 0 4px; }
-  .scope-pill {
-    flex: 1; height: 34px; border-radius: 20px;
-    border: 1.5px solid var(--border, #2a2a2a); background: var(--bg-card, #1a1a1a);
-    color: var(--text-mid, #a0a0a0); font-family: var(--font-ui, sans-serif);
-    font-size: 13px; font-weight: 600; cursor: pointer;
+  /* ── FAB: nueva búsqueda ─────────────────────────────────── */
+  .fab-search {
+    position: fixed;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    right: 18px;
+    z-index: 40;
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: var(--amber);
+    color: #000;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    animation: fab-in 0.2s cubic-bezier(0.34,1.4,0.64,1);
+    transition: transform 0.15s, box-shadow 0.15s;
   }
-  .scope-pill.active { border-color: var(--amber, #f5a623); color: var(--amber, #f5a623); background: #2a1e00; }
+  .fab-search:active {
+    transform: scale(0.91);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  }
+  @keyframes fab-in {
+    from { transform: scale(0.6) translateY(10px); opacity: 0; }
+    to   { transform: scale(1)   translateY(0);    opacity: 1; }
+  }
+
+  /* ── Tab selector animado ───────────────────────────────────── */
+  .tab-rail {
+    position: relative; display: flex;
+    background: var(--bg-input, #141414);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 10px; padding: 3px; height: 44px;
+    margin: 8px 0 4px; overflow: hidden;
+  }
+
+  /* Pastilla deslizante */
+  .tab-slider-bg {
+    position: absolute; top: 3px; left: 3px;
+    height: calc(100% - 6px);
+    width: calc(50% - 3px);
+    background: var(--bg-card, #1a1a1a);
+    border: 1px solid var(--border-hi, #3a3a3a);
+    border-radius: 8px;
+    transition: transform 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+    pointer-events: none;
+  }
+  /* Al seleccionar "Todo el catálogo", la pastilla se desliza a la derecha */
+  .tab-rail.right .tab-slider-bg { transform: translateX(calc(100% + 3px)); }
+
+  .tab-btn {
+    flex: 1; position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-family: var(--font-ui, sans-serif); font-size: 14px; font-weight: 600;
+    color: var(--text-lo, #555);
+    border: none; background: transparent; cursor: pointer;
+    border-radius: 8px; transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    letter-spacing: 0.01em;
+  }
+  .tab-btn.tab-active { color: var(--text-hi, #f0f0f0); }
 
   /* ── Campana ─────────────────────────────────────────────────── */
   .bell-btn {
@@ -474,7 +568,7 @@
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s;
   }
-  .expiring-full-link:active { background: #2a1e00; }
+  .expiring-full-link:active { background: var(--amber-bg, #2a1e00); }
 
   @keyframes slide-up {
     from { transform: translateY(40px); opacity: 0; }

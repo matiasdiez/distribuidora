@@ -37,6 +37,19 @@
     flex-shrink: 0;
   }
 
+  /* ── Light mode ──────────────────────────────────────────────── */
+  @media (prefers-color-scheme: light) {
+    .skeleton {
+      --skeleton-base:  #e8e8e8;
+      --skeleton-shine: #f2f2f2;
+    }
+  }
+
+  :global([data-theme="light"]) .skeleton {
+    --skeleton-base:  #e8e8e8;
+    --skeleton-shine: #f2f2f2;
+  }
+
   @keyframes skeleton-pulse {
     0%   { background-position: 200% center; }
     100% { background-position: -200% center; }

@@ -124,17 +124,21 @@
     </button>
   </header>
 
-  <!-- Tabs de período -->
-  <div class="tabs">
-    {#each ([7, 30, 60, 90] as const) as d}
-      <button
-        class="tab"
-        class:active={daysFilter === d}
-        on:click={() => daysFilter = d}
-      >
-        {d === 7 ? 'Esta semana' : d === 30 ? '30 días' : d === 60 ? '60 días' : '90 días'}
-      </button>
-    {/each}
+  <!-- Tab slider animado — coherente con App.svelte -->
+  <div class="tab-rail-wrap">
+    <div class="tab-rail"
+         class:s1={daysFilter===30}
+         class:s2={daysFilter===60}
+         class:s3={daysFilter===90}>
+      <div class="tab-slider-bg"></div>
+      {#each ([7, 30, 60, 90] as const) as d}
+        <button
+          class="tab-btn"
+          class:active={daysFilter === d}
+          on:click={() => (daysFilter = d)}
+        >{d === 7 ? '7 días' : d === 30 ? '30 días' : d === 60 ? '60 días' : '90 días'}</button>
+      {/each}
+    </div>
   </div>
 
   {#if loading}
@@ -312,30 +316,41 @@
   .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Tabs */
-  .tabs {
-    display: flex; gap: 6px;
-    overflow-x: auto; padding: 10px 12px;
-    scrollbar-width: none; flex-shrink: 0;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
+  /* ── Tab slider ────────────────────────────────────────────── */
+  .tab-rail-wrap { padding: 10px 14px 8px; flex-shrink: 0; }
 
-  .tab {
-    flex-shrink: 0; height: 30px; padding: 0 12px;
-    border-radius: 20px;
-    border: 1.5px solid var(--border, #2a2a2a);
+  .tab-rail {
+    position: relative; display: flex;
+    background: var(--bg-input, #141414);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 10px; padding: 3px; height: 44px; overflow: hidden;
+  }
+
+  .tab-slider-bg {
+    position: absolute; top: 3px; left: 3px;
+    height: calc(100% - 6px); width: calc(25% - 2px);
     background: var(--bg-card, #1a1a1a);
-    color: var(--text-mid, #a0a0a0);
-    font-family: var(--font-ui, sans-serif);
-    font-size: 13px; font-weight: 600;
-    cursor: pointer;
+    border: 1px solid var(--border-hi, #3a3a3a);
+    border-radius: 7px;
+    transition: transform 0.28s cubic-bezier(0.34,1.3,0.64,1);
+    pointer-events: none;
+  }
+  /* Desplazamiento de la pastilla según tab activo */
+  .tab-rail.s1 .tab-slider-bg { transform: translateX(calc(100% + 2px)); }
+  .tab-rail.s2 .tab-slider-bg { transform: translateX(calc(200% + 4px)); }
+  .tab-rail.s3 .tab-slider-bg { transform: translateX(calc(300% + 6px)); }
+
+  .tab-btn {
+    flex: 1; position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 700;
+    color: var(--text-lo, #555);
+    border: none; background: transparent; cursor: pointer;
+    border-radius: 7px; transition: color 0.2s;
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    letter-spacing: 0.04em;
   }
-  .tab.active {
-    border-color: var(--amber, #f5a623);
-    color: var(--amber, #f5a623);
-    background: #2a1e00;
-  }
+  .tab-btn.active { color: var(--text-hi, #f0f0f0); }
 
   /* Summary bar */
   .summary-bar {
@@ -349,7 +364,7 @@
   }
   .chip-urgent { background: #2a0a0a; color: var(--red, #f87171); }
   .chip-soon   { background: #2a1400; color: #fb923c; }
-  .chip-later  { background: #2a1e00; color: var(--amber, #f5a623); }
+  .chip-later  { background: var(--amber-bg, #2a1e00); color: var(--amber, #f5a623); }
 
   /* List */
   .lot-list {
@@ -441,7 +456,7 @@
   .expiry-soon .exp-days { background: #2a1400; color: #fb923c; }
 
   .expiry-later .exp-date { color: var(--amber, #f5a623); }
-  .expiry-later .exp-days { background: #2a1e00; color: var(--amber, #f5a623); }
+  .expiry-later .exp-days { background: var(--amber-bg, #2a1e00); color: var(--amber, #f5a623); }
 
   /* Splash / Empty */
   .splash, .empty {

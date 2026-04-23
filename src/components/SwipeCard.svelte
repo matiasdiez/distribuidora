@@ -172,7 +172,7 @@
   .card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .card-brand { font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 700; color: var(--amber, #f5a623); text-transform: uppercase; letter-spacing: 0.06em; }
   .card-stock-badge { font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1.5px solid; white-space: nowrap; }
-  .card-stock-badge.ok    { color: var(--green, #4ade80); border-color: var(--green, #4ade80); background: #0d1f14; }
+  .card-stock-badge.ok    { color: var(--green, #4ade80); border-color: var(--green, #4ade80); background: var(--green-dim, #0d1f14); }
   .card-stock-badge.empty { color: var(--text-lo, #555);  border-color: var(--border, #2a2a2a); background: transparent; }
 
   /* Producto */
@@ -199,7 +199,7 @@
     height: 52px;
     border-radius: 10px;
     border: 1.5px solid var(--amber-dim, #b57a1a);
-    background: #1a1200;
+    background: var(--amber-bg, #1a1200);
     color: var(--amber, #f5a623);
     font-family: var(--font-ui, sans-serif);
     font-size: 17px;
@@ -210,7 +210,7 @@
     transition: background 0.15s;
     margin-top: auto;
   }
-  .add-stock-btn:active { background: #2a1e00; }
+  .add-stock-btn:active { background: var(--amber-bg, #2a1e00); }
 
   /* Swipe hint */
   .swipe-hint { display: flex; justify-content: space-between; font-family: var(--font-mono, monospace); font-size: 10px; color: var(--text-lo, #555); letter-spacing: 0.05em; padding-top: 2px; }

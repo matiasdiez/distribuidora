@@ -2,7 +2,18 @@
  * Depósito App — Diseño industrial / gestión de almacén
  * Tipografía: Inter (UI) + IBM Plex Mono (datos/código)
  * Tamaños: base 19px (+20% vs 16px anterior)
+ *
+ * ── Tailwind CSS ─────────────────────────────────────────────────
+ * @tailwind base      → Reset normalizado (Preflight). applyBaseStyles:false
+ *                       en astro.config lo desactiva globalmente para que
+ *                       solo se aplique UNA vez desde acá, en el orden correcto.
+ * @tailwind components → Clases de componente (@layer components).
+ * @tailwind utilities  → Clases utilitarias (bg-*, text-*, flex, etc.).
+ * ────────────────────────────────────────────────────────────────
  */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
 
@@ -16,6 +27,7 @@
 
   --amber:      #f5a623;
   --amber-dim:  #b57a1a;
+  --amber-bg:   #1a1200;   /* fondo tintado ámbar */
   --green:      #4ade80;
   --green-dim:  #166534;
   --red:        #f87171;
@@ -47,6 +59,7 @@
 
     --amber:      #c97d10;
     --amber-dim:  #e8a020;
+    --amber-bg:   #fdf3e0;   /* fondo tintado ámbar (light) */
     --green:      #16a34a;
     --green-dim:  #dcfce7;
     --red:        #dc2626;
@@ -71,6 +84,7 @@
 
   --amber:      #c97d10;
   --amber-dim:  #e8a020;
+  --amber-bg:   #fdf3e0;   /* fondo tintado ámbar (light) */
   --green:      #16a34a;
   --green-dim:  #dcfce7;
   --red:        #dc2626;
@@ -94,6 +108,7 @@
 
   --amber:      #f5a623;
   --amber-dim:  #b57a1a;
+  --amber-bg:   #1a1200;   /* fondo tintado ámbar (dark) */
   --green:      #4ade80;
   --green-dim:  #166534;
   --red:        #f87171;
@@ -288,3 +303,24 @@ body {
 ::-webkit-scrollbar       { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+/* ── Compatibilidad con Tailwind Preflight ──────────────────────
+ * Preflight (@tailwind base) normaliza los estilos del navegador.
+ * Las reglas de abajo restauran los comportamientos específicos
+ * de esta app que Preflight modificaría.
+ * ────────────────────────────────────────────────────────────── */
+
+/* Preflight elimina list-style en <ul>/<ol>.
+   Los menús de la app usan <ul> sin clases → restaurar si es necesario. */
+ul, ol { list-style: none; }
+
+/* Preflight pone border-style:solid y color heredado en todos los bordes.
+   Nuestros bordes ya se manejan por variable, no hay conflicto. */
+
+/* Preflight quita márgenes de headings. Los componentes Svelte usan
+   sus propios estilos scoped así que no afecta. */
+
+/* input[type=search] tiene -webkit-appearance problemático en Safari.
+   Preflight ya lo normaliza, pero lo reforzamos: */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button { display: none; }

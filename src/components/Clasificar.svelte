@@ -456,7 +456,7 @@
   .tab.active {
     border-color: var(--amber, #f5a623);
     color: var(--amber, #f5a623);
-    background: #2a1e00;
+    background: var(--amber-bg, #2a1e00);
   }
 
   .tab-count {
@@ -476,7 +476,7 @@
     justify-content: space-between;
     gap: 8px;
     padding: 8px 12px;
-    background: #1a1200;
+    background: var(--amber-bg, #1a1200);
     border-top: 1px solid var(--amber-dim, #b57a1a);
     border-bottom: 1px solid var(--amber-dim, #b57a1a);
     position: sticky;
@@ -500,7 +500,7 @@
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    background: #2a1e00;
+    background: var(--amber-bg, #2a1e00);
     border: 1px solid var(--amber-dim, #b57a1a);
     color: var(--amber, #f5a623);
     font-size: 12px;
@@ -562,7 +562,7 @@
   .saved-toast {
     margin: 8px 12px 0;
     padding: 8px 14px;
-    background: #166534;
+    background: var(--green-dim, #166534);
     color: var(--green, #4ade80);
     border-radius: 6px;
     font-family: var(--font-mono, monospace);
@@ -636,7 +636,7 @@
 
   .p-row.is-selected {
     border-color: var(--amber, #f5a623);
-    background: #1a1200;
+    background: var(--amber-bg, #1a1200);
   }
 
   .p-row.is-assigned {

@@ -257,20 +257,36 @@
   .header-title { flex: 1; font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-hi); text-transform: uppercase; letter-spacing: 0.08em; display: flex; align-items: center; gap: 6px; }
   .counters { display: flex; gap: 8px; }
   .counter { font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-  .counter.open { color: var(--amber); background: #1a1200; border: 1px solid var(--amber-dim, #b57a1a); }
+  .counter.open { color: var(--amber); background: var(--amber-bg, #1a1200); border: 1px solid var(--amber-dim, #b57a1a); }
   .counter.done { color: var(--text-lo); background: var(--bg-card); border: 1px solid var(--border); }
 
-  /* Filtros */
-  .filters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-  .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
-  .filter-btn { height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--border-hi); background: var(--bg-card); color: var(--text-mid); font-family: var(--font-mono); font-size: 11px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, background 0.15s; }
-  .filter-btn.active { border-color: var(--amber); color: var(--amber); background: #1a1200; }
-  .filter-icon-btn { height: 28px; width: 28px; border-radius: 14px; border: 1px solid var(--border-hi); background: var(--bg-card); color: var(--text-lo); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  /* ── Filtros — todos los botones a 42px de alto ────────────── */
+  .filters { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 10px; border-bottom: 1px solid var(--border); }
+  .filter-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+  /* Botón base — 42px, igual en todas las variantes */
+  .filter-btn,
+  .filter-icon-btn,
+  .filter-prio-btn {
+    height: 42px;
+    border-radius: var(--radius, 8px);
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-hi);
+    background: var(--bg-card);
+    color: var(--text-mid);
+  }
+  .filter-btn       { padding: 0 16px; letter-spacing: 0.02em; }
+  .filter-icon-btn  { width: 42px; flex-shrink: 0; }
+  .filter-prio-btn  { padding: 0 14px; font-size: 11px; color: var(--text-lo); border-color: var(--border); }
+
+  .filter-btn.active      { border-color: var(--amber); color: var(--amber); background: var(--amber-bg, #1a1200); }
   .filter-icon-btn.active { border-color: var(--amber); color: var(--amber); }
-  .filter-prio-btn { height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-lo); font-family: var(--font-mono); font-size: 10px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .filter-prio-btn.active.prio-low    { border-color: #4ade80; color: #4ade80; background: #0d1f0d; }
-  .filter-prio-btn.active.prio-normal { border-color: #818cf8; color: #818cf8; background: #0d0d1f; }
-  .filter-prio-btn.active.prio-high   { border-color: var(--red); color: var(--red); background: #1f0d0d; }
+  .filter-prio-btn.active.prio-low    { border-color: #4ade80; color: #4ade80; background: var(--green-dim, #0d1f0d); }
+  .filter-prio-btn.active.prio-normal { border-color: #818cf8; color: #818cf8; background: rgba(129,140,248,0.12); }
+  .filter-prio-btn.active.prio-high   { border-color: var(--red); color: var(--red); background: var(--red-dim, #1f0d0d); }
 
   /* Grupos y tarjetas */
   .task-list { display: flex; flex-direction: column; gap: 14px; }
@@ -291,9 +307,9 @@
 
   .task-meta { display: flex; gap: 8px; align-items: center; padding-left: 28px; }
   .prio-badge { display: flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; }
-  .prio-low    { background: #0d1f0d; color: #4ade80; border: 1px solid #1c3a28; }
-  .prio-normal { background: #0d0d1f; color: #818cf8; border: 1px solid #1e1e3a; }
-  .prio-high   { background: #1f0d0d; color: var(--red, #f87171); border: 1px solid #4a1010; }
+  .prio-low    { background: var(--green-dim, #0d1f0d); color: var(--green, #4ade80); border: 1px solid var(--green-dim, #1c3a28); }
+  .prio-normal { background: rgba(129,140,248,0.12); color: #818cf8; border: 1px solid rgba(129,140,248,0.25); }
+  .prio-high   { background: var(--red-dim, #1f0d0d); color: var(--red, #f87171); border: 1px solid var(--red-dim, #4a1010); }
   .due { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); }
   .due.overdue { color: var(--red); }
   .overdue-text { font-weight: 700; }
@@ -303,12 +319,12 @@
   .edit-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border-hi); border-radius: 6px; color: var(--text-hi); font-family: var(--font-ui); font-size: 14px; padding: 8px 10px; resize: none; box-sizing: border-box; }
   .edit-task-row { display: flex; }
   .task-toggle-btn { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .task-toggle-btn.active { border-color: var(--amber); color: var(--amber); background: #1a1200; }
+  .task-toggle-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-bg, #1a1200); }
   .edit-fields { display: flex; flex-direction: column; gap: 6px; }
   .prio-selector { display: flex; gap: 6px; }
   .prio-btn { flex: 1; height: 28px; border-radius: 4px; border: 1px solid var(--border-hi); background: var(--bg); color: var(--text-mid); font-family: var(--font-mono); font-size: 10px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .prio-btn.active.prio-low    { border-color: #4ade80; color: #4ade80; background: #0d1f0d; }
-  .prio-btn.active.prio-normal { border-color: #818cf8; color: #818cf8; background: #0d0d1f; }
+  .prio-btn.active.prio-low    { border-color: #4ade80; color: #4ade80; background: var(--green-dim, #0d1f0d); }
+  .prio-btn.active.prio-normal { border-color: #818cf8; color: #818cf8; background: rgba(129,140,248,0.12); }
   .prio-btn.active.prio-high   { border-color: var(--red); color: var(--red); background: #1f0d0d; }
   .edit-date { height: 34px; font-size: 12px; }
   .edit-actions { display: flex; gap: 8px; }

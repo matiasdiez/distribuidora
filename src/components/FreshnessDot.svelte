@@ -56,7 +56,7 @@
     bottom: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
-    background: #1a1a1a;
+    background: var(--bg-card, #1a1a1a);
     border: 1px solid #3a3a3a;
     color: #f0f0f0;
     font-family: var(--font-mono, monospace);

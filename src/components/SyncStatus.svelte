@@ -87,7 +87,7 @@
   .pending-badge {
     display: inline-flex; align-items: center; gap: 3px;
     font-family: var(--font-mono); font-size: 10px;
-    color: var(--amber); background: #2a1e00;
+    color: var(--amber); background: var(--amber-bg, #2a1e00);
     padding: 2px 6px; border-radius: 3px;
   }
   .dead-badge {

@@ -97,6 +97,12 @@
     onCategoryChange(cat);
     await runSearch();
   }
+
+  // Callable from parent via bind:this={buscadorRef}
+  export function focusInput() {
+    inputEl?.focus();
+    inputEl?.select();
+  }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -247,7 +253,7 @@
     display: flex; align-items: center; gap: 5px;
     margin-left: 10px;
     padding: 5px 4px 5px 8px;
-    background: #2a1e00;
+    background: var(--amber-bg, #2a1e00);
     border: 1.5px solid var(--amber, #f5a623);
     border-radius: 20px;
     flex-shrink: 0;
@@ -290,7 +296,7 @@
     transition: background 0.1s;
   }
   .suggestion-item:last-child { border-bottom: none; }
-  .suggestion-item:active { background: #2a1e00; }
+  .suggestion-item:active { background: var(--amber-bg, #2a1e00); }
   :global(.sug-icon) { color: var(--amber, #f5a623); flex-shrink: 0; }
   .sug-brand {
     flex: 1;
@@ -325,7 +331,7 @@
   .filter-pill.active {
     border-color: var(--amber, #f5a623);
     color: var(--amber, #f5a623);
-    background: #2a1e00;
+    background: var(--amber-bg, #2a1e00);
   }
   .filter-pill:active { opacity: 0.7; }
 

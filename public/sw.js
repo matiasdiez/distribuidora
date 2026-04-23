@@ -11,7 +11,7 @@
  * En CI/CD esto puede generarse automáticamente con el hash del build.
  */
 
-const SW_VERSION = "v0.11.3";
+const SW_VERSION = "v0.10.0";
 const CACHE_NAME = `deposito-${SW_VERSION}`;
 const OFFLINE_URL = "/";
 

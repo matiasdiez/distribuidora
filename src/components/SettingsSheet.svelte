@@ -467,7 +467,7 @@
 
   .new-depot-error.is-warning {
     color: var(--amber, #f5a623);
-    background: #1a1200;
+    background: var(--amber-bg, #1a1200);
   }
 
   .new-depot-actions {
@@ -673,7 +673,7 @@
   .dl-toggle { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); cursor: pointer; }
   .dl-desc { font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); line-height: 1.4; }
   .dl-list { display: flex; flex-direction: column; gap: 4px; }
-  .dl-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: #1a0808; border: 1px solid var(--red, #f87171); border-radius: 6px; }
+  .dl-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: var(--red-dim, #1a0808); border: 1px solid var(--red, #f87171); border-radius: 6px; }
   .dl-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .dl-type { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--red, #f87171); }
   .dl-error { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

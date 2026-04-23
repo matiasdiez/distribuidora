@@ -383,8 +383,8 @@
     width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .cat-icon { background: #1a1200; color: var(--amber); border: 1px solid var(--amber-dim, #b57a1a); }
-  .sub-icon { background: #0d1a2a; color: #60a5fa;   border: 1px solid #1e3a5a; }
+  .cat-icon { background: var(--amber-bg, #1a1200); color: var(--amber); border: 1px solid var(--amber-dim, #b57a1a); }
+  .sub-icon { background: var(--bg-input); color: var(--blue, #60a5fa); border: 1px solid var(--border); }
   .menu-text { flex: 1; display: flex; flex-direction: column; gap: 3px; }
   .menu-label { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-hi); }
   .menu-desc  { font-family: var(--font-ui); font-size: 12px; color: var(--text-lo); line-height: 1.3; }
@@ -401,7 +401,7 @@
   }
   .item-row.pending-delete {
     border-color: var(--red, #f87171);
-    background: #1a0808;
+    background: var(--red-dim, #1a0808);
     flex-wrap: wrap;
   }
 
@@ -426,7 +426,7 @@
   .item-delete:hover, .item-delete:active {
     border-color: var(--red, #f87171);
     color: var(--red, #f87171);
-    background: #1a0808;
+    background: var(--red-dim, #1a0808);
   }
 
   /* Confirmación de borrado — ocupa toda la fila, con texto claro */
@@ -464,7 +464,7 @@
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
   .depot-tab.active {
-    border-color: var(--amber); color: var(--amber); background: #1a1200;
+    border-color: var(--amber); color: var(--amber); background: var(--amber-bg, #1a1200);
   }
 
   /* Formulario agregar */
@@ -487,13 +487,13 @@
   .add-input:focus { border-color: var(--amber); }
   .add-btn {
     width: 48px; height: 48px; border-radius: 8px;
-    border: 1.5px solid var(--amber-dim, #b57a1a); background: #1a1200;
+    border: 1.5px solid var(--amber-dim, #b57a1a); background: var(--amber-bg, #1a1200);
     color: var(--amber); display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0;
     -webkit-tap-highlight-color: transparent; transition: background 0.15s;
   }
   .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .add-btn:not(:disabled):active { background: #2a1e00; }
+  .add-btn:not(:disabled):active { background: var(--amber-bg, #2a1e00); }
   .add-hint {
     font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); line-height: 1.4;
   }
@@ -506,7 +506,7 @@
   .error-msg {
     display: flex; align-items: center; gap: 6px;
     font-family: var(--font-mono); font-size: 12px; color: var(--red, #f87171);
-    padding: 8px 12px; background: #1a0808; border-radius: 6px; margin-bottom: 10px;
+    padding: 8px 12px; background: var(--red-dim, #1a0808); border-radius: 6px; margin-bottom: 10px;
   }
   .skel-list { display: flex; flex-direction: column; }
 
