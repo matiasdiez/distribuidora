@@ -11,39 +11,67 @@
  * @tailwind utilities  → Clases utilitarias (bg-*, text-*, flex, etc.).
  * ────────────────────────────────────────────────────────────────
  */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+@theme {
+  /* Colores mapeados a variables CSS */
+  --color-app: var(--bg);
+  --color-card: var(--bg-card);
+  --color-input: var(--bg-input);
+  --color-border-app: var(--border);
+  --color-border-hi: var(--border-hi);
+  --color-hi: var(--text-hi);
+  --color-mid: var(--text-mid);
+  --color-lo: var(--text-lo);
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-ok: var(--green);
+  --color-ok-dim: var(--green-dim);
+  --color-danger: var(--red);
+  --color-danger-dim: var(--red-dim);
+  --color-info: var(--blue);
+
+  /* Tipografía */
+  --font-ui: var(--font-ui), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
+  /* Spacing y Dimensiones */
+  --spacing-touch: var(--touch);
+  --spacing-gap: var(--gap);
+
+  /* Border Radius */
+  --radius-app: var(--radius);
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;700&display=swap");
 
 /* ── Variables — Dark Theme (default) ──────────────────────── */
 :root {
-  --bg:         #0d0d0d;
-  --bg-card:    #1a1a1a;
-  --bg-input:   #141414;
-  --border:     #2a2a2a;
-  --border-hi:  #3a3a3a;
+  --bg: #0d0d0d;
+  --bg-card: #1a1a1a;
+  --bg-input: #141414;
+  --border: #2a2a2a;
+  --border-hi: #3a3a3a;
 
-  --amber:      #f5a623;
-  --amber-dim:  #b57a1a;
-  --amber-bg:   #1a1200;   /* fondo tintado ámbar */
-  --green:      #4ade80;
-  --green-dim:  #166534;
-  --red:        #f87171;
-  --red-dim:    #7f1d1d;
-  --blue:       #60a5fa;
+  --amber: #f5a623;
+  --amber-dim: #b57a1a;
+  --amber-bg: #1a1200; /* fondo tintado ámbar */
+  --green: #4ade80;
+  --green-dim: #166534;
+  --red: #f87171;
+  --red-dim: #7f1d1d;
+  --blue: #60a5fa;
 
-  --text-hi:    #f0f0f0;
-  --text-mid:   #a0a0a0;
-  --text-lo:    #555;
+  --text-hi: #f0f0f0;
+  --text-mid: #a0a0a0;
+  --text-lo: #555;
 
-  --font-ui:    'Inter', sans-serif;
-  --font-mono:  'IBM Plex Mono', monospace;
+  --font-ui: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 
-  --radius:     8px;
-  --touch:      58px;    /* 52 × 1.12 ≈ 58px táctil */
-  --gap:        14px;
+  --radius: 8px;
+  --touch: 58px; /* 52 × 1.12 ≈ 58px táctil */
+  --gap: 14px;
 
   color-scheme: dark;
 }
@@ -51,24 +79,24 @@
 /* ── Variables — Light Theme ───────────────────────────────── */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg:         #f5f0e8;
-    --bg-card:    #ffffff;
-    --bg-input:   #faf7f2;
-    --border:     #d8d0c4;
-    --border-hi:  #b8ae9f;
+    --bg: #f5f0e8;
+    --bg-card: #ffffff;
+    --bg-input: #faf7f2;
+    --border: #d8d0c4;
+    --border-hi: #b8ae9f;
 
-    --amber:      #c97d10;
-    --amber-dim:  #e8a020;
-    --amber-bg:   #fdf3e0;   /* fondo tintado ámbar (light) */
-    --green:      #16a34a;
-    --green-dim:  #dcfce7;
-    --red:        #dc2626;
-    --red-dim:    #fee2e2;
-    --blue:       #2563eb;
+    --amber: #c97d10;
+    --amber-dim: #e8a020;
+    --amber-bg: #fdf3e0; /* fondo tintado ámbar (light) */
+    --green: #16a34a;
+    --green-dim: #dcfce7;
+    --red: #dc2626;
+    --red-dim: #fee2e2;
+    --blue: #2563eb;
 
-    --text-hi:    #1a1510;
-    --text-mid:   #5a5045;
-    --text-lo:    #9a8f82;
+    --text-hi: #1a1510;
+    --text-mid: #5a5045;
+    --text-lo: #9a8f82;
 
     color-scheme: light;
   }
@@ -76,67 +104,73 @@
 
 /* Forzar light si data-theme="light" */
 [data-theme="light"] {
-  --bg:         #f5f0e8;
-  --bg-card:    #ffffff;
-  --bg-input:   #faf7f2;
-  --border:     #d8d0c4;
-  --border-hi:  #b8ae9f;
+  --bg: #f5f0e8;
+  --bg-card: #ffffff;
+  --bg-input: #faf7f2;
+  --border: #d8d0c4;
+  --border-hi: #b8ae9f;
 
-  --amber:      #c97d10;
-  --amber-dim:  #e8a020;
-  --amber-bg:   #fdf3e0;   /* fondo tintado ámbar (light) */
-  --green:      #16a34a;
-  --green-dim:  #dcfce7;
-  --red:        #dc2626;
-  --red-dim:    #fee2e2;
-  --blue:       #2563eb;
+  --amber: #c97d10;
+  --amber-dim: #e8a020;
+  --amber-bg: #fdf3e0; /* fondo tintado ámbar (light) */
+  --green: #16a34a;
+  --green-dim: #dcfce7;
+  --red: #dc2626;
+  --red-dim: #fee2e2;
+  --blue: #2563eb;
 
-  --text-hi:    #1a1510;
-  --text-mid:   #5a5045;
-  --text-lo:    #9a8f82;
+  --text-hi: #1a1510;
+  --text-mid: #5a5045;
+  --text-lo: #9a8f82;
 
   color-scheme: light;
 }
 
 /* Forzar dark si data-theme="dark" */
 [data-theme="dark"] {
-  --bg:         #0d0d0d;
-  --bg-card:    #1a1a1a;
-  --bg-input:   #141414;
-  --border:     #2a2a2a;
-  --border-hi:  #3a3a3a;
+  --bg: #0d0d0d;
+  --bg-card: #1a1a1a;
+  --bg-input: #141414;
+  --border: #2a2a2a;
+  --border-hi: #3a3a3a;
 
-  --amber:      #f5a623;
-  --amber-dim:  #b57a1a;
-  --amber-bg:   #1a1200;   /* fondo tintado ámbar (dark) */
-  --green:      #4ade80;
-  --green-dim:  #166534;
-  --red:        #f87171;
-  --red-dim:    #7f1d1d;
-  --blue:       #60a5fa;
+  --amber: #f5a623;
+  --amber-dim: #b57a1a;
+  --amber-bg: #1a1200; /* fondo tintado ámbar (dark) */
+  --green: #4ade80;
+  --green-dim: #166534;
+  --red: #f87171;
+  --red-dim: #7f1d1d;
+  --blue: #60a5fa;
 
-  --text-hi:    #f0f0f0;
-  --text-mid:   #a0a0a0;
-  --text-lo:    #555;
+  --text-hi: #f0f0f0;
+  --text-mid: #a0a0a0;
+  --text-lo: #555;
 
   color-scheme: dark;
 }
 
 /* ── Reset & base ──────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 html {
   background: var(--bg);
   color: var(--text-hi);
   font-family: var(--font-ui);
-  font-size: 19px;           /* base 16 × 1.2 = 19.2 → 19px */
+  font-size: 19px; /* base 16 × 1.2 = 19.2 → 19px */
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
   /* Mejora el rendering de Inter en todas las plataformas */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'tnum' 1;   /* tabular numerals para columnas de stock */
+  font-feature-settings: "tnum" 1; /* tabular numerals para columnas de stock */
 }
 
 body {
@@ -162,7 +196,7 @@ body {
 
 .app-logo {
   font-family: var(--font-mono);
-  font-size: 14px;           /* 11 × 1.2 ≈ 13, arredondado a 14 */
+  font-size: 14px; /* 11 × 1.2 ≈ 13, arredondado a 14 */
   font-weight: 700;
   color: var(--amber);
   letter-spacing: 0.05em;
@@ -184,7 +218,7 @@ body {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 12px;           /* 11 → 12 */
+  font-size: 12px; /* 11 → 12 */
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 4px;
@@ -192,10 +226,22 @@ body {
   letter-spacing: 0.04em;
 }
 
-.badge-green  { background: var(--green-dim);  color: var(--green); }
-.badge-red    { background: var(--red-dim);    color: var(--red);   }
-.badge-amber  { background: #2a1e00;           color: var(--amber); }
-.badge-blue   { background: #1e2d40;           color: var(--blue);  }
+.badge-green {
+  background: var(--green-dim);
+  color: var(--green);
+}
+.badge-red {
+  background: var(--red-dim);
+  color: var(--red);
+}
+.badge-amber {
+  background: #2a1e00;
+  color: var(--amber);
+}
+.badge-blue {
+  background: #1e2d40;
+  color: var(--blue);
+}
 
 /* ── Botones ───────────────────────────────────────────────── */
 .btn {
@@ -207,17 +253,21 @@ body {
   padding: 0 24px;
   border-radius: var(--radius);
   font-family: var(--font-ui);
-  font-size: 17px;           /* acá mantenemos 17 para no agrandar demasiado botones */
+  font-size: 17px; /* acá mantenemos 17 para no agrandar demasiado botones */
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
   border: none;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
-.btn:active { opacity: 0.75; }
+.btn:active {
+  opacity: 0.75;
+}
 
 .btn-primary {
   background: var(--amber);
@@ -252,7 +302,7 @@ body {
   border-radius: var(--radius);
   color: var(--text-hi);
   font-family: var(--font-ui);
-  font-size: 19px;           /* 18 → 19 (base) */
+  font-size: 19px; /* 18 → 19 (base) */
   font-weight: 400;
   padding: 0 16px;
   outline: none;
@@ -288,21 +338,28 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 56px 24px;        /* 48 × 1.2 ≈ 58, 56 es cómodo */
+  padding: 56px 24px; /* 48 × 1.2 ≈ 58, 56 es cómodo */
   color: var(--text-lo);
-  font-size: 17px;           /* 15 × 1.2 = 18 → 17 */
+  font-size: 17px; /* 15 × 1.2 = 18 → 17 */
   text-align: center;
 }
 
 .empty-icon {
-  font-size: 43px;           /* 36 × 1.2 = 43.2 */
+  font-size: 43px; /* 36 × 1.2 = 43.2 */
   opacity: 0.4;
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border-radius: 3px;
+}
 
 /* ── Compatibilidad con Tailwind Preflight ──────────────────────
  * Preflight (@tailwind base) normaliza los estilos del navegador.
@@ -312,7 +369,10 @@ body {
 
 /* Preflight elimina list-style en <ul>/<ol>.
    Los menús de la app usan <ul> sin clases → restaurar si es necesario. */
-ul, ol { list-style: none; }
+ul,
+ol {
+  list-style: none;
+}
 
 /* Preflight pone border-style:solid y color heredado en todos los bordes.
    Nuestros bordes ya se manejan por variable, no hay conflicto. */
@@ -323,4 +383,6 @@ ul, ol { list-style: none; }
 /* input[type=search] tiene -webkit-appearance problemático en Safari.
    Preflight ya lo normaliza, pero lo reforzamos: */
 input[type="search"]::-webkit-search-decoration,
-input[type="search"]::-webkit-search-cancel-button { display: none; }
+input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}

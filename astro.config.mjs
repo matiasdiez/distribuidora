@@ -1,7 +1,7 @@
 import { defineConfig } from "astro/config";
 import svelte from "@astrojs/svelte";
 import node from "@astrojs/node";
-import tailwind from "@astrojs/tailwind";
+import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
@@ -11,10 +11,8 @@ export default defineConfig({
   }),
   integrations: [
     svelte(),
-    tailwind({
-      // No inyectar estilos base de Tailwind automáticamente;
-      // los agregamos manualmente en global.css para controlar el orden.
-      applyBaseStyles: false,
-    }),
   ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });
