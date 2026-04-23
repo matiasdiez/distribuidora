@@ -526,7 +526,7 @@
   }
   .bell-btn.has-alerts { border-color: var(--red, #f87171); color: var(--red, #f87171); }
   .bell-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
-  .bell-btn.has-alerts .bell-wrap svg { animation: bell-ring 2.4s ease-in-out infinite; transform-origin: top center; }
+  .bell-btn.has-alerts .bell-wrap :global(svg) { animation: bell-ring 2.4s ease-in-out infinite; transform-origin: top center; }
   @keyframes bell-ring {
     0%, 100% { transform: rotate(0deg); } 10% { transform: rotate(14deg); }
     20% { transform: rotate(-12deg); } 30% { transform: rotate(10deg); }

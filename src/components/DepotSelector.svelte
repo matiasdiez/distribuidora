@@ -162,7 +162,7 @@
     letter-spacing: 0.05em;
   }
 
-  .spin {
+  :global(.spin) {
     font-size: 28px;
     color: var(--amber);
     animation: spin 1.2s linear infinite;
@@ -206,6 +206,4 @@
       transform: rotate(360deg);
     }
   }
-  :global(.spin) { animation: spin 1.2s linear infinite; }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 </style>

@@ -301,7 +301,7 @@
     {:else if filteredBrands.length === 0}
       <div class="empty-state">
         <PackageSearch size={36} strokeWidth={1.5} />
-        {searchQuery ? \`Sin marcas para "\${searchQuery}"\` : 'Sin productos'}
+        {searchQuery ? `Sin marcas para "${searchQuery}"` : 'Sin productos'}
       </div>
     {:else}
       <div class="brand-list">

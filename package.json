@@ -18,10 +18,9 @@
     "svelte": "^5.0.0"
   },
   "devDependencies": {
-    "@astrojs/tailwind": "^5.1.0",
     "@types/node": "^22.0.0",
-    "autoprefixer": "^10.4.0",
     "tailwindcss": "^4.2.4",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "@tailwindcss/vite": "^4.2.4"
   }
 }

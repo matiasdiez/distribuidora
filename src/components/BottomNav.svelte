@@ -7,7 +7,7 @@
   const dispatch = createEventDispatcher<{ settings: void }>();
 </script>
 
-<nav class="bottom-nav" role="navigation" aria-label="Navegación principal">
+<nav class="bottom-nav" aria-label="Navegación principal">
 
   <a href="/" class="nav-item" class:active={activePage === 'search'}
     aria-label="Buscar productos" aria-current={activePage === 'search' ? 'page' : undefined}>

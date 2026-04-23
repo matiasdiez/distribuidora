@@ -5,13 +5,11 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
-  output: "server", // páginas estáticas + API routes server-side (antes "hybrid", removido en Astro 5)
+  output: "server",
   adapter: node({
-    mode: "standalone", // para Fly.io
+    mode: "standalone",
   }),
-  integrations: [
-    svelte(),
-  ],
+  integrations: [svelte()],
   vite: {
     plugins: [tailwindcss()],
   },

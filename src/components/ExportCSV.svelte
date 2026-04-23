@@ -129,8 +129,7 @@
     color: var(--green, #4ade80);
   }
   .export-btn.disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-icon { font-size: 14px; line-height: 1; }
   .count { color: var(--text-lo, #555); font-size: 10px; }
-  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  :global(.spin) { display: inline-block; animation: spin 1s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

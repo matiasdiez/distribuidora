@@ -664,34 +664,15 @@
     letter-spacing: 0.03em;
   }
 
-  :global(.spin) { animation: spin 1s linear infinite; }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 
 
-  /* Dead letters */
-  .dl-header { display: flex; align-items: center; justify-content: space-between; }
-  .dl-toggle { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); cursor: pointer; }
-  .dl-desc { font-family: var(--font-mono); font-size: 11px; color: var(--text-lo); line-height: 1.4; }
-  .dl-list { display: flex; flex-direction: column; gap: 4px; }
-  .dl-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: var(--red-dim, #1a0808); border: 1px solid var(--red, #f87171); border-radius: 6px; }
-  .dl-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .dl-type { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--red, #f87171); }
-  .dl-error { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dl-date { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); }
-  .dl-dismiss { flex-shrink: 0; width: 30px; height: 30px; border-radius: 4px; border: 1px solid var(--border-hi); background: none; color: var(--text-lo); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .dl-dismiss:hover { border-color: var(--red); color: var(--red); }
-  .dl-clear-all { width: 100%; height: 36px; border-radius: 6px; border: 1.5px solid var(--red, #f87171); background: #2a0a0a; color: var(--red, #f87171); font-family: var(--font-mono); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; }
+  /* Dead letter CSS movido a cola pendiente — ver v11 */
+  /* .dl-* styles — template no renderizado todavía */
 
   .sync-row          { transition: border-color 0.15s, color 0.15s; }
-  :global(.spin) { animation: spin 1s linear infinite; }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  .sync-row.sync-ok  { border-color: var(--green, #4ade80); color: var(--green, #4ade80); }
-  :global(.spin) { animation: spin 1s linear infinite; }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  .sync-row.sync-error { border-color: var(--red, #f87171); color: var(--red, #f87171); }
-  :global(.spin) { animation: spin 1s linear infinite; }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  .sync-row:disabled { opacity: 0.7; cursor: not-allowed; }
+.sync-ok  { border-color: var(--green, #4ade80); color: var(--green, #4ade80); }
+.sync-error { border-color: var(--red, #f87171); color: var(--red, #f87171); }
+:disabled { opacity: 0.7; cursor: not-allowed; }
 
   .sync-hint {
     font-family: var(--font-mono);
@@ -702,7 +683,7 @@
     padding: 0 2px;
   }
 
-  .spin {
+  :global(.spin) {
     display: inline-block;
     animation: spin 1s linear infinite;
   }
