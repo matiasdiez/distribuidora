@@ -89,20 +89,25 @@
   }
 
   // ──────────────────────────────────────────────────────────────
-  // Swipe gesture
-  // SNAP  → revela el botón de acción (card queda "abierta")
-  // READY → al soltar aquí, se auto-confirma la acción
+  // Swipe gesture — estilo Gmail/Spark Mail
+  // SNAP  → revela el botón (~80px): card queda "abierta", botón tappeable
+  // READY → al soltar aquí, se auto-confirma la acción (~160px)
   // MAX   → tope con rubber-band effect
+  //
+  // FIX CLAVE: al detectar gesto horizontal, reseteamos startX al punto
+  // actual del dedo. Esto elimina el "salto" visual porque el card empieza
+  // a moverse desde cero en el momento de la detección, no desde el inicio
+  // del touch donde ya había recorrido varios píxeles sin moverse.
   // ──────────────────────────────────────────────────────────────
-  const SNAP  = 82;
-  const READY = 155;
-  const MAX   = 200;
+  const SNAP  = 80;
+  const READY = 160;
+  const MAX   = 210;
 
   let openCardId: number | null = null;
 
   interface DragState {
     id:     number;
-    startX: number;
+    startX: number;  // se resetea cuando se confirma gesto horizontal
     startY: number;
     locked: boolean;
     horiz:  boolean | null;
@@ -142,9 +147,14 @@
     const dy = e.clientY - drag.startY;
 
     if (drag.horiz === null) {
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-        drag = { ...drag, horiz: true };
-      } else if (Math.abs(dy) > 10) {
+      if (Math.abs(dx) > 5 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        // ── Gesto horizontal confirmado ──
+        // Reseteamos startX al punto actual del dedo para que el card
+        // empiece a moverse desde 0, eliminando el salto visual inicial.
+        drag = { ...drag, horiz: true, startX: e.clientX };
+        liveOffset = 0;
+        return; // el movimiento real se registra en el próximo evento
+      } else if (Math.abs(dy) > 8) {
         drag = { ...drag, locked: true };
         return;
       } else return;
@@ -152,18 +162,20 @@
 
     e.preventDefault();
 
-    const base = openCardId === id ? -SNAP : 0;
-    const raw  = base + dx;
+    // dx calculado desde el momento en que se confirmó el gesto (startX ya fue reseteado)
+    const newDx = e.clientX - drag.startX;
+    const base  = openCardId === id ? -SNAP : 0;
+    const raw   = base + newDx;
 
     if (raw > 0) {
-      // Swipe derecha → bounce elástico, no snap (acción futura)
-      liveOffset = Math.min(36, 36 * (1 - Math.exp(-dx / 55))) - base;
+      // Swipe derecha → bounce elástico suave (acción futura)
+      liveOffset = Math.min(36, 36 * (1 - Math.exp(-newDx / 55))) - base;
     } else if (raw < -MAX) {
       // Rubber-band al superar el límite
       const excess = -raw - MAX;
       liveOffset = -(MAX + excess * 0.18) - base;
     } else {
-      liveOffset = dx;
+      liveOffset = newDx;
     }
   }
 
@@ -186,6 +198,13 @@
     liveOffset = 0;
   }
 
+  // pointercancel: el browser toma control (scroll vertical), limpiamos estado
+  function onPtrCancel(e: PointerEvent, id: number) {
+    if (!drag || drag.id !== id) return;
+    drag = null;
+    liveOffset = 0;
+  }
+
   function doConfirm(id: number) {
     confirming = new Set([...confirming, id]);
     drag = null; liveOffset = 0; openCardId = null;
@@ -201,8 +220,12 @@
   }
 
   function handleCardClick(product: Product) {
-    // Si el card está abierto, cerrarlo en lugar de abrir modal
     if (openCardId === product.id) { openCardId = null; return; }
+  }
+
+  function handlePanelClick(e: MouseEvent | PointerEvent, id: number) {
+    e.stopPropagation();
+    if (openCardId === id) doConfirm(id);
   }
 </script>
 
@@ -239,11 +262,12 @@
         {@const hasSt = depotId !== "unassigned" && depotId !== undefined && (si.units > 0 || si.boxes > 0)}
         {@const fresh = freshnessCache[product.id]}
 
-        {@const isConf = confirming.has(product.id)}
-        {@const offX   = isConf ? -600 : cardOffset(product.id)}
-        {@const s      = stretchOf(product.id)}
-        {@const rdy    = isReadyToConfirm(product.id)}
-        {@const isDrag = drag?.id === product.id && drag.horiz === true && !drag.locked}
+        {@const isConf  = confirming.has(product.id)}
+        {@const offX    = isConf ? -600 : cardOffset(product.id)}
+        {@const s       = stretchOf(product.id)}
+        {@const rdy     = isReadyToConfirm(product.id)}
+        {@const isDrag  = drag?.id === product.id && drag.horiz === true && !drag.locked}
+        {@const isOpen  = openCardId === product.id}
 
         <div class="swipe-row">
 
@@ -255,12 +279,20 @@
           </div>
 
           <!-- Panel: swipe IZQUIERDA → Sin stock (derecha del card) -->
-          <div class="action-panel action-nostock"
-               class:action-ready={rdy}
-               style="
-                 background: hsl(0,{44 + s*36}%,{7 + s*14}%);
-                 opacity: {Math.min(1, Math.max(0, -offX / (SNAP * 0.6)))};
-               ">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <div
+            class="action-panel action-nostock"
+            class:action-ready={rdy}
+            class:action-open={isOpen}
+            style="
+              background: hsl(0,{44 + s*36}%,{7 + s*14}%);
+              opacity: {Math.min(1, Math.max(0, -offX / (SNAP * 0.5)))};
+              pointer-events: {isOpen ? 'auto' : 'none'};
+            "
+            on:click={(e) => handlePanelClick(e, product.id)}
+            on:pointerdown={(e) => e.stopPropagation()}
+          >
             <span class="act-icon" style="transform:scale({1 + s * 0.55}) scaleX({1 + s * 0.22})">
               <PackageX size={21} strokeWidth={2} />
             </span>
@@ -274,10 +306,11 @@
           <div
             class="product-card"
             class:has-stock={hasSt}
-            style="transform:translateX({offX}px);transition:{isDrag?'none':isConf?'transform 0.2s ease-in':'transform 0.27s cubic-bezier(0.34,1.45,0.64,1)'};"
+            style="transform:translateX({offX}px);transition:{isDrag?'none':isConf?'transform 0.2s ease-in':'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)'};"
             on:pointerdown={(e) => onPtrDown(e, product.id)}
             on:pointermove={(e) => onPtrMove(e, product.id)}
             on:pointerup={(e)   => onPtrUp(e, product.id)}
+            on:pointercancel={(e) => onPtrCancel(e, product.id)}
             on:click={() => handleCardClick(product)}
           >
             <div class="status-bar" class:stock-ok={hasSt} class:stock-no={!hasSt}></div>
@@ -377,6 +410,11 @@
   .action-nostock {
     right: 0; color: #fca5a5;
     transition: background 0.06s linear;
+    cursor: pointer;
+  }
+  /* Cuando está revelado y es tappeable: feedback visual al presionar */
+  .action-nostock.action-open:active {
+    filter: brightness(1.3);
   }
   .action-nostock.action-ready { color: #fff; }
 
@@ -405,7 +443,8 @@
     will-change: transform;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    touch-action: pan-y; /* permite scroll vertical, no horizontal */
+    /* pan-y: el browser maneja scroll vertical; horizontal llega a JS */
+    touch-action: pan-y;
   }
 
   .status-bar { width: 4px; flex-shrink: 0; }
