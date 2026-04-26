@@ -502,21 +502,23 @@
   .add-note-btn { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--amber-dim, #b57a1a); background: var(--amber-bg, #1a1200); color: var(--amber); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   /* Lista de marcas */
-  .brand-list { display: flex; flex-direction: column; gap: 4px; }
+  .brand-list { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
   .brand-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 12px; background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 8px; cursor: pointer; text-align: left; width: 100%;
-    -webkit-tap-highlight-color: transparent; transition: border-color 0.15s;
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 16px; background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; text-align: left; width: 100%;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s;
   }
-  .brand-row:active { border-color: var(--amber); }
-  .brand-name { flex: 1; font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: 0.04em; }
+  .brand-row:active { background: var(--bg-input); }
+  .brand-name { flex: 1; font-size: 17px; font-weight: 700; color: var(--text-hi); }
   .brand-meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); display: flex; align-items: center; gap: 5px; }
   .note-badge { display: flex; align-items: center; gap: 3px; color: var(--amber); font-size: 10px; }
   :global(.brand-arrow) { color: var(--text-lo); flex-shrink: 0; }
 
   /* Frescura */
-  .freshness-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .freshness-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .freshness-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; }
   .f-today  { background: var(--green, #4ade80); color: var(--green, #4ade80); }
   .f-recent { background: #a3e635; color: #a3e635; }
@@ -528,9 +530,9 @@
   .legend-item { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text-lo); }
 
   /* Notas */
-  .notes-section { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-  .notes-section-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo); display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
-  .note-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .notes-section { display: flex; flex-direction: column; margin-bottom: 16px; border-top: 1px solid var(--border); }
+  .notes-section-label { font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-lo); display: flex; align-items: center; gap: 5px; padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .note-card { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
   .note-card.note-done { opacity: 0.5; }
   .note-top { display: flex; align-items: flex-start; gap: 8px; }
   .note-check { flex-shrink: 0; width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--border-hi); background: var(--bg); color: var(--green); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -575,8 +577,8 @@
   .notes-empty-btn:hover { border-color: var(--amber); color: var(--amber); }
 
   /* Productos */
-  .brand-products { display: flex; flex-direction: column; gap: 4px; }
-  .prod-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; }
+  .brand-products { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+  .prod-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
   .prod-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .prod-name { font-family: var(--font-ui); font-size: 15px; font-weight: 600; color: var(--text-hi); }
   .prod-weight { font-family: var(--font-mono); font-size: 11px; color: var(--text-mid); }

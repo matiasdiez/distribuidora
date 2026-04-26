@@ -614,37 +614,41 @@
   .product-list {
     flex: 1;
     overflow-y: auto;
-    padding: 0 12px 100px;
+    padding: 0 0 100px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    border-top: 1px solid var(--border, #2a2a2a);
   }
 
   .p-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 52px;
-    padding: 10px 12px;
+    min-height: 56px;
+    padding: 11px 16px;
     background: var(--bg-card, #1a1a1a);
-    border: 1px solid var(--border, #2a2a2a);
-    border-radius: 7px;
+    border-bottom: 1px solid var(--border, #2a2a2a);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: border-color 0.12s, background 0.12s;
+    transition: background 0.12s;
   }
 
   .p-row.is-selected {
-    border-color: var(--amber, #f5a623);
     background: var(--amber-bg, #1a1200);
+    border-left: 4px solid var(--amber, #f5a623);
+    padding-left: 12px;
   }
 
   .p-row.is-assigned {
-    border-color: #1e2d40;
+    border-left: 4px solid var(--blue, #60a5fa);
+    padding-left: 12px;
+    opacity: 0.65;
   }
 
   .p-row.is-selected.is-assigned {
-    border-color: var(--amber, #f5a623);
+    border-left: 4px solid var(--amber, #f5a623);
+    background: var(--amber-bg, #1a1200);
+    opacity: 1;
   }
 
   /* Checkbox */

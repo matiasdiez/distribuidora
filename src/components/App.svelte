@@ -497,7 +497,7 @@
     background: var(--bg-card, #1a1a1a);
     border: 1px solid var(--border-hi, #3a3a3a);
     border-radius: 8px;
-    transition: transform 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+    transition: transform 0.42s cubic-bezier(0.28, 1.9, 0.56, 1);
     pointer-events: none;
   }
   /* Al seleccionar "Todo el catálogo", la pastilla se desliza a la derecha */

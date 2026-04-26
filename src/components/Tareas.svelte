@@ -167,7 +167,12 @@
           </div>
 
           {#each brandNotes as note}
-            <div class="task-card" class:task-done={note.status === 'done'} class:task-high={note.priority === 'high' && note.status === 'open'}>
+            <div class="task-card"
+              class:task-done={note.status === 'done'}
+              class:task-high={note.priority === 'high' && note.status === 'open'}
+              class:task-normal={note.priority === 'normal'}
+            >
+              <div class="task-card-inner">
 
               {#if editingId === note.id}
                 <!-- Formulario de edición inline -->
@@ -242,6 +247,7 @@
                   </div>
                 {/if}
               {/if}
+              </div><!-- /task-card-inner -->
             </div>
           {/each}
         </div>
@@ -289,13 +295,27 @@
   .filter-prio-btn.active.prio-high   { border-color: var(--red); color: var(--red); background: var(--red-dim, #1f0d0d); }
 
   /* Grupos y tarjetas */
-  .task-list { display: flex; flex-direction: column; gap: 14px; }
-  .brand-group { display: flex; flex-direction: column; gap: 4px; }
-  .brand-group-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lo); display: flex; align-items: center; gap: 5px; padding: 2px 2px 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .task-list { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+  .brand-group { display: flex; flex-direction: column; }
+  .brand-group-label { font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-lo); display: flex; align-items: center; gap: 6px; padding: 7px 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
 
-  .task-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+  .task-card {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 14px 12px 0;
+    display: flex; flex-direction: column; gap: 5px;
+    position: relative;
+  }
+  /* Left priority accent bar via padding trick */
+  .task-card-inner {
+    padding-left: 14px;
+    display: flex; flex-direction: column; gap: 5px;
+    border-left: 4px solid var(--border);
+  }
+  .task-card.task-high .task-card-inner  { border-left-color: var(--red, #f87171); }
+  .task-card.task-normal .task-card-inner { border-left-color: var(--text-lo, #555); }
+  .task-card.task-done .task-card-inner  { border-left-color: var(--border); }
   .task-card.task-done { opacity: 0.45; }
-  .task-card.task-high { border-color: #4a1010; }
 
   .task-top { display: flex; align-items: flex-start; gap: 8px; }
   .task-check { flex-shrink: 0; width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--border-hi); background: var(--bg); color: var(--green); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }

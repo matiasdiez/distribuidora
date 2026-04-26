@@ -726,7 +726,7 @@
     background: var(--bg-card, #1a1a1a);
     border: 1px solid var(--border-hi, #3a3a3a);
     border-radius: 7px;
-    transition: transform 0.28s cubic-bezier(0.34,1.3,0.64,1);
+    transition: transform 0.42s cubic-bezier(0.28, 1.9, 0.56, 1);
     pointer-events: none;
   }
   .tab-rail.right .tab-slider-bg { transform: translateX(calc(100% + 3px)); }
@@ -791,10 +791,10 @@
   .brands-grid {
     flex: 1;
     overflow-y: auto;
-    padding: 0 12px 16px;
+    padding: 0 0 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    border-top: 1px solid var(--border, #2a2a2a);
   }
 
   .brand-btn {
@@ -802,31 +802,26 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    min-height: 52px;
-    padding: 12px 16px;
+    min-height: 56px;
+    padding: 13px 18px;
     background: var(--bg-card, #1a1a1a);
-    border: 1px solid var(--border, #2a2a2a);
-    border-radius: 8px;
+    border-bottom: 1px solid var(--border, #2a2a2a);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition:
-      border-color 0.15s,
-      background 0.15s;
+    transition: background 0.12s;
     text-align: left;
   }
 
   .brand-btn:active {
-    border-color: var(--amber, #f5a623);
-    background: var(--amber-bg, #1a1200);
+    background: var(--bg-input, #141414);
   }
 
   .brand-name {
-    font-family: var(--font-mono, monospace);
-    font-size: 13px;
+    font-family: var(--font-ui, sans-serif);
+    font-size: 17px;
     font-weight: 700;
     color: var(--text-hi, #f0f0f0);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    letter-spacing: 0.01em;
   }
 
   .brand-right {

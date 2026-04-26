@@ -39,6 +39,24 @@
   let thresholds: FreshnessThresholds | null = null;
 
   onMount(async () => { thresholds = await loadThresholds(); });
+
+  // ── Svelte action: registra touch listeners no-pasivos ────────
+  // Usamos una action en lugar de onMount+bind:this porque el contenedor
+  // está dentro de un {:else} y no existe cuando onMount corre por primera vez.
+  function touchListeners(node: HTMLElement) {
+    node.addEventListener("touchstart",  onTouchStart,  { passive: true  });
+    node.addEventListener("touchmove",   onTouchMove,   { passive: false }); // NON-PASSIVE → permite preventDefault en horizontal
+    node.addEventListener("touchend",    onTouchEnd,    { passive: true  });
+    node.addEventListener("touchcancel", onTouchCancel, { passive: true  });
+    return {
+      destroy() {
+        node.removeEventListener("touchstart",  onTouchStart);
+        node.removeEventListener("touchmove",   onTouchMove);
+        node.removeEventListener("touchend",    onTouchEnd);
+        node.removeEventListener("touchcancel", onTouchCancel);
+      }
+    };
+  }
   $: if (visibleProducts.length > 0 && thresholds) loadCaches(visibleProducts);
 
   async function loadCaches(list: Product[]) {
@@ -88,17 +106,7 @@
     return text.replace(new RegExp(`(${esc})`, "gi"), "<mark>$1</mark>");
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Swipe gesture — estilo Gmail/Spark Mail
-  // SNAP  → revela el botón (~80px): card queda "abierta", botón tappeable
-  // READY → al soltar aquí, se auto-confirma la acción (~160px)
-  // MAX   → tope con rubber-band effect
-  //
-  // FIX CLAVE: al detectar gesto horizontal, reseteamos startX al punto
-  // actual del dedo. Esto elimina el "salto" visual porque el card empieza
-  // a moverse desde cero en el momento de la detección, no desde el inicio
-  // del touch donde ya había recorrido varios píxeles sin moverse.
-  // ──────────────────────────────────────────────────────────────
+  // ── Swipe gesture ─────────────────────────────────────────────
   const SNAP  = 80;
   const READY = 160;
   const MAX   = 210;
@@ -107,7 +115,7 @@
 
   interface DragState {
     id:     number;
-    startX: number;  // se resetea cuando se confirma gesto horizontal
+    startX: number;
     startY: number;
     locked: boolean;
     horiz:  boolean | null;
@@ -123,7 +131,6 @@
     return base;
   }
 
-  // 0 = recién reveló botón · 1 = listo para confirmar
   function stretchOf(id: number): number {
     const off = Math.abs(cardOffset(id));
     if (off <= SNAP) return 0;
@@ -134,44 +141,50 @@
     return Math.abs(cardOffset(id)) >= READY * 0.88;
   }
 
-  function onPtrDown(e: PointerEvent, id: number) {
+  // ── Helpers para Touch Events ──────────────────────────────────
+  function getCardId(target: EventTarget | null): number | null {
+    const card = (target as Element)?.closest("[data-id]");
+    if (!card) return null;
+    const id = parseInt(card.getAttribute("data-id") ?? "");
+    return isNaN(id) ? null : id;
+  }
+
+  function onTouchStart(e: TouchEvent) {
+    if ((e.target as Element)?.closest("button")) return;
+    const t = e.touches[0];
+    const id = getCardId(e.target);
+    if (id === null) return;
     if (openCardId !== null && openCardId !== id) openCardId = null;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    drag = { id, startX: e.clientX, startY: e.clientY, locked: false, horiz: null };
+    drag = { id, startX: t.clientX, startY: t.clientY, locked: false, horiz: null };
     liveOffset = 0;
   }
 
-  function onPtrMove(e: PointerEvent, id: number) {
-    if (!drag || drag.id !== id || drag.locked) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
+  function onTouchMove(e: TouchEvent) {
+    if (!drag || drag.locked) return;
+    if (e.touches.length > 1) { drag = { ...drag, locked: true }; return; }
+    const t  = e.touches[0];
+    const dx = t.clientX - drag.startX;
+    const dy = t.clientY - drag.startY;
 
     if (drag.horiz === null) {
       if (Math.abs(dx) > 5 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-        // ── Gesto horizontal confirmado ──
-        // Reseteamos startX al punto actual del dedo para que el card
-        // empiece a moverse desde 0, eliminando el salto visual inicial.
-        drag = { ...drag, horiz: true, startX: e.clientX };
+        drag = { ...drag, horiz: true, startX: t.clientX };
         liveOffset = 0;
-        return; // el movimiento real se registra en el próximo evento
+        e.preventDefault();
       } else if (Math.abs(dy) > 8) {
         drag = { ...drag, locked: true };
-        return;
-      } else return;
+      }
+      return;
     }
 
     e.preventDefault();
-
-    // dx calculado desde el momento en que se confirmó el gesto (startX ya fue reseteado)
-    const newDx = e.clientX - drag.startX;
-    const base  = openCardId === id ? -SNAP : 0;
+    const newDx = t.clientX - drag.startX;
+    const base  = openCardId === drag.id ? -SNAP : 0;
     const raw   = base + newDx;
 
     if (raw > 0) {
-      // Swipe derecha → bounce elástico suave (acción futura)
       liveOffset = Math.min(36, 36 * (1 - Math.exp(-newDx / 55))) - base;
     } else if (raw < -MAX) {
-      // Rubber-band al superar el límite
       const excess = -raw - MAX;
       liveOffset = -(MAX + excess * 0.18) - base;
     } else {
@@ -179,8 +192,9 @@
     }
   }
 
-  function onPtrUp(e: PointerEvent, id: number) {
-    if (!drag || drag.id !== id) return;
+  function onTouchEnd(_e: TouchEvent) {
+    if (!drag) return;
+    const id  = drag.id;
     const off = cardOffset(id);
 
     if (drag.horiz && !drag.locked) {
@@ -193,14 +207,14 @@
       } else {
         if (openCardId === id) openCardId = null;
       }
+    } else if (!drag.horiz && !drag.locked) {
+      if (openCardId === id) openCardId = null;
     }
     drag = null;
     liveOffset = 0;
   }
 
-  // pointercancel: el browser toma control (scroll vertical), limpiamos estado
-  function onPtrCancel(e: PointerEvent, id: number) {
-    if (!drag || drag.id !== id) return;
+  function onTouchCancel(_e: TouchEvent) {
     drag = null;
     liveOffset = 0;
   }
@@ -219,11 +233,7 @@
     }
   }
 
-  function handleCardClick(product: Product) {
-    if (openCardId === product.id) { openCardId = null; return; }
-  }
-
-  function handlePanelClick(e: MouseEvent | PointerEvent, id: number) {
+  function handlePanelClick(e: MouseEvent, id: number) {
     e.stopPropagation();
     if (openCardId === id) doConfirm(id);
   }
@@ -255,7 +265,7 @@
       </span>
     </div>
 
-    <div class="product-list">
+    <div class="product-list" use:touchListeners>
       {#each visibleProducts as product (product.id)}
 
         {@const si    = stockCache[product.id] ?? { units: 0, boxes: 0, noStockConfirmed: false }}
@@ -263,11 +273,18 @@
         {@const fresh = freshnessCache[product.id]}
 
         {@const isConf  = confirming.has(product.id)}
-        {@const offX    = isConf ? -600 : cardOffset(product.id)}
-        {@const s       = stretchOf(product.id)}
-        {@const rdy     = isReadyToConfirm(product.id)}
-        {@const isDrag  = drag?.id === product.id && drag.horiz === true && !drag.locked}
         {@const isOpen  = openCardId === product.id}
+        {@const isDrag  = drag?.id === product.id && drag.horiz === true && !drag.locked}
+        <!-- Inlinear los cálculos que usan liveOffset para que Svelte
+             detecte la dependencia reactiva y re-renderice en cada touchmove.
+             Si va a través de funciones (cardOffset, stretchOf) Svelte
+             no sabe que dependen de liveOffset y no actualiza el DOM. -->
+        {@const _moving = drag?.id === product.id && !drag?.locked && drag?.horiz !== false}
+        {@const _base   = isOpen ? -SNAP : 0}
+        {@const offX    = isConf ? -600 : (_moving ? _base + liveOffset : _base)}
+        {@const _absOff = Math.abs(offX)}
+        {@const s       = _absOff <= SNAP ? 0 : Math.min(1, (_absOff - SNAP) / (READY - SNAP))}
+        {@const rdy     = _absOff >= READY * 0.88}
 
         <div class="swipe-row">
 
@@ -289,6 +306,8 @@
               background: hsl(0,{44 + s*36}%,{7 + s*14}%);
               opacity: {Math.min(1, Math.max(0, -offX / (SNAP * 0.5)))};
               pointer-events: {isOpen ? 'auto' : 'none'};
+              width: {Math.max(0, -offX)}px;
+              transition: {isDrag ? 'none' : 'width 0.3s cubic-bezier(0.25,0.46,0.45,0.94)'};
             "
             on:click={(e) => handlePanelClick(e, product.id)}
             on:pointerdown={(e) => e.stopPropagation()}
@@ -301,17 +320,11 @@
             </span>
           </div>
 
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <!-- svelte-ignore a11y-no-static-element-interactions -->
           <div
             class="product-card"
             class:has-stock={hasSt}
+            data-id={product.id}
             style="transform:translateX({offX}px);transition:{isDrag?'none':isConf?'transform 0.2s ease-in':'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)'};"
-            on:pointerdown={(e) => onPtrDown(e, product.id)}
-            on:pointermove={(e) => onPtrMove(e, product.id)}
-            on:pointerup={(e)   => onPtrUp(e, product.id)}
-            on:pointercancel={(e) => onPtrCancel(e, product.id)}
-            on:click={() => handleCardClick(product)}
           >
             <div class="status-bar" class:stock-ok={hasSt} class:stock-no={!hasSt}></div>
 
@@ -399,7 +412,10 @@
 
   /* ── Panels de acción ────────────────────────────────────────── */
   .action-panel {
-    position: absolute; top: 0; bottom: 0; width: 92px;
+    position: absolute; top: 0; bottom: 0;
+    /* width controlado inline en el panel nostock para seguir el dedo;
+       el panel future mantiene ancho fijo */
+    width: 80px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 4px;
     pointer-events: none;
@@ -554,4 +570,7 @@
   /* ── Light mode ──────────────────────────────────────────────── */
   :global([data-theme="light"]) .product-card { background: var(--bg-card); }
   :global([data-theme="light"]) .add-btn { background: var(--bg-input); }
+  /* Panel "Sin stock" en light mode: rojo vivo estilo Gmail (override inline style) */
+  :global([data-theme="light"]) .action-nostock { color: #fff !important; background: #e53935 !important; }
+  :global([data-theme="light"]) .action-nostock.action-ready { background: #b71c1c !important; }
 </style>

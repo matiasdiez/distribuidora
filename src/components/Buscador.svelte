@@ -58,7 +58,12 @@
 
   function handleInput() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(runSearch, 150);
+    // Cuando el campo queda vacío, mostrar todos los resultados de inmediato
+    if (!query && !pinnedBrand) {
+      runSearch();
+    } else {
+      debounceTimer = setTimeout(runSearch, 150);
+    }
   }
 
   function pinBrand(brand: string) {
